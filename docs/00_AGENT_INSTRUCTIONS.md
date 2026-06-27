@@ -15,6 +15,7 @@ A **21-day AI Engineering plan** for building **PULSE** — personal AI Intellig
 | `02_21day_plan.md` | **Single source of truth:** tasks, concepts, questions, buffers, MVP, adaptability | Every day |
 | `03_patterns_reference.md` | 12 patterns — architecture, code, Demo Script | When pattern unclear |
 | `04_tech_stack.md` | Versions, deps-by-day, Docker, deploy map, `.env` | Install / debug |
+| `journal.md` | Daily log: done / deferred / learned | End of each day |
 
 Import rules and version pins: **`CLAUDE.md`** (always loaded).
 
@@ -28,6 +29,8 @@ Import rules and version pins: **`CLAUDE.md`** (always loaded).
 3. Answer 🤔 Understanding question (5 min, write it down)
 4. Stuck on pattern → 03_patterns_reference.md
 5. Stuck on dependency → 04_tech_stack.md
+6. After deliverable works: run /code-review to catch architecture drift before the next day builds on it
+7. Append entry to `docs/journal.md` (done / deferred / learned / 🤔 answer)
 ```
 
 **Buffer days (B1 after D7, B2 after D15):** structure in `02_21day_plan.md` → Buffer Day sections.
