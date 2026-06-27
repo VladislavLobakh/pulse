@@ -31,7 +31,19 @@ uv run ruff check --fix && uv run ruff format
 ```
 
 ## Project status
-- **Day:** D1 (not started) · **Phase:** 1 — Intelligence · **MVP:** 0
+- **Day:** D1 ✅ → next: D2 · **Phase:** 1 — Intelligence · **MVP:** 0
+
+## Module layout
+```
+src/pulse/
+  models.py       — shared domain types (Article, Source, ArticleList, enums)
+  collectors/     — one file per data source; own the fetch + parse logic
+  agents/         — thin orchestration wrappers; import from collectors + models, no fetch logic
+  display.py      — terminal/CLI output only
+  scripts/        — runnable utilities (generate_test_data, run_digest, etc.)
+tests/            — mirrors src/pulse/ structure
+```
+New shared types → `models.py`. New data source → `collectors/<name>.py`. Agents never fetch directly.
 
 ## Where things live
 - Specs: `docs/` — read the relevant file before each day (see `docs/00_AGENT_INSTRUCTIONS.md`)

@@ -53,6 +53,7 @@ pulse/
 | `docs/02_21day_plan.md` | Day-by-day plan + concepts + questions + adaptability |
 | `docs/03_patterns_reference.md` | 12 agentic patterns + Demo Script |
 | `docs/04_tech_stack.md` | Versions, deps-by-day, Docker, deploy map |
+| `docs/journal.md` | Daily build log (done / deferred / learned) |
 
 ## Stack (2026)
 
