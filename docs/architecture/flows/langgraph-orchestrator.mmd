@@ -1,0 +1,21 @@
+---
+title: "Orchestrator state graph (target / Planned)"
+---
+flowchart TD
+    start([Request]) --> reason["reason_node<br/>(plan what to search)"]
+    reason --> act["act_node<br/>(tavily / source tools)"]
+    act --> observe{"observe_node<br/>score sufficient?"}
+    observe -- "no · score &lt; threshold" --> reason
+    observe -- "yes" --> route{"route_by_source"}
+    route --> hn[HN agent]
+    route --> arxiv[ArXiv agent]
+    route --> yt[YouTube agent]
+    route --> news[Newsletter agent]
+    hn --> collect[[collect into PulseState]]
+    arxiv --> collect
+    yt --> collect
+    news --> collect
+    collect --> done([Digest / report])
+
+    note["recursion_limit=10 guards the reason→act→observe loop"]
+    observe -.-> note

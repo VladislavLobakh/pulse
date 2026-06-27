@@ -1,0 +1,21 @@
+---
+title: "Content pipeline: draft → publish (target / Planned)"
+---
+sequenceDiagram
+    participant Trig as Trigger (cron Mon/Wed/Fri or on-demand)
+    participant Gen as Post Generator
+    participant SC as Self-correction
+    participant Ver as Self-verification
+    participant HITL as HITL pause (Inngest)
+    participant User as User (Dashboard)
+    participant LI as LinkedIn
+
+    Trig->>Gen: generate draft from insight
+    Gen->>SC: improve draft (score 0.51 → 0.79)
+    SC->>Ver: verify facts
+    Ver-->>Ver: VERIFIED / UNVERIFIED / CONTRADICTED
+    Ver->>HITL: pause for human review
+    HITL->>User: draft waiting in DraftInbox
+    User-->>HITL: approve / edit
+    HITL->>LI: publish (stub until LinkedIn API)
+    LI-->>User: post live

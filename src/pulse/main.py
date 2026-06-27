@@ -1,4 +1,4 @@
-"""PULSE — main entry point (D1: HN agent only)."""
+"""PULSE CLI entry point — HN article collection."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pulse.models import ArticleList
 
 
 def main() -> None:
-    print("PULSE D1 — collecting AI articles from Hacker News...")
+    print("PULSE — collecting AI articles from Hacker News...")
     articles: ArticleList = fetch_hn_articles()
     warn_if_below_minimum(articles, MIN_ARTICLES)
     print_articles(articles)
