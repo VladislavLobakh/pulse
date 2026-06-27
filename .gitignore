@@ -21,3 +21,7 @@ wheels/
 
 # Personal planning notes (local only)
 plan/
+
+# Structurizr local runtime (source of truth: workspace.dsl)
+docs/architecture/.structurizr/
+docs/architecture/workspace.json

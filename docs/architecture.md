@@ -130,9 +130,14 @@ Diagrams are updated **in the same commit as the code** that adds or changes the
 
 ```bash
 docker run --rm -p 8081:8080 \
-  -v "$PWD/docs/architecture:/usr/local/structurizr" structurizr/lite
+  -v "$PWD/docs/architecture:/usr/local/structurizr" structurizr/structurizr local
 # open http://localhost:8081 → Context · Container_Now · Container_Target
 ```
+
+Use `structurizr/structurizr local` (not deprecated `structurizr/lite`). If port 8081 is busy:
+`docker ps --filter publish=8081` then `docker stop <id>`, or map another host port (e.g. `-p 8082:8080`).
+
+Structurizr writes local cache (`.structurizr/`) and `workspace.json` on first run — both are gitignored; commit changes to `workspace.dsl` only.
 
 **Mermaid** — GitHub renders fenced ` ```mermaid ``` ` blocks inside `.md` files natively.
 Standalone `.mmd` files are displayed as plain text on GitHub — use the CLI or VS Code
