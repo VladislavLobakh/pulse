@@ -1,0 +1,24 @@
+---
+title: "HN collect flow (current / Implemented)"
+---
+sequenceDiagram
+    actor User
+    participant CLI as CLI entry (hn_agent / main)
+    participant Col as collectors.tavily
+    participant API as Tavily API
+    participant Disp as display
+
+    alt pulse.agents.hn_agent
+        User->>CLI: uv run python -m pulse.agents.hn_agent
+    else pulse.main
+        User->>CLI: uv run python -m pulse.main
+    end
+    CLI->>CLI: fetch_hn_articles()
+    CLI->>Col: search_articles(query, Source.HACKER_NEWS)
+    Col->>API: TavilyClient.search("AI LLM site:news.ycombinator.com")
+    API-->>Col: raw results[]
+    Col->>Col: parse_tavily_results() → ArticleList
+    Col-->>CLI: ArticleList
+    CLI->>Disp: warn_if_below_minimum(articles, min_count)
+    CLI->>Disp: print_articles(articles)
+    Disp-->>User: N articles (title, url, score, summary)

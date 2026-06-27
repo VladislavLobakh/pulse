@@ -1,0 +1,20 @@
+---
+title: "Daily digest pipeline (target / Planned)"
+---
+sequenceDiagram
+    participant Cron as Digest Scheduler (08:00 UTC)
+    participant Orch as Orchestrator (LangGraph)
+    participant Src as Source agents (HN/ArXiv/YT/News)
+    participant Mem as Mem0 profile
+    participant Rank as Rank + FlashRank
+    participant TG as Telegram
+
+    Cron->>Orch: trigger daily digest
+    Orch->>Src: asyncio.gather() — fetch last 24h
+    Src-->>Orch: ArticleList (all sources)
+    Orch->>Mem: load personal profile
+    Mem-->>Orch: interests / weights
+    Orch->>Rank: score relevance × novelty × quality
+    Rank-->>Orch: top 5 insights
+    Orch->>TG: send digest (5 ranked insights)
+    TG-->>Orch: delivered

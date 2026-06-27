@@ -1,7 +1,7 @@
 [project]
 name = "pulse"
 version = "0.1.0"
-description = "Personal AI Intelligence & Content Factory — digest + LinkedIn posts from 6 AI news sources"
+description = "Personal AI Intelligence & Content Factory — digest + LinkedIn posts from 5 AI news sources"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

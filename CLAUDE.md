@@ -1,8 +1,6 @@
 # PULSE — AI Intelligence & Content Factory
 
-Building PULSE to become an AI Engineer: a system that collects AI news from 5 sources, filters through a personal profile, builds a knowledge graph, and generates a personalized digest + LinkedIn posts.
-
-**KPI:** "1 digest instead of 3h reading · 3 LinkedIn posts/week without stress"
+PULSE — personal AI intelligence & content factory: collects AI news from multiple sources, filters through a personal profile, builds a knowledge graph, and produces a digest + LinkedIn drafts.
 
 ## Critical import rules
 ```python
@@ -14,6 +12,8 @@ from fastmcp import FastMCP                     # NOT mcp.server.fastmcp
 - `langgraph>=1.2.0` — NOT 1.0.x (breaking change in prebuilt)
 - `langchain-mcp-adapters>=0.3.0` — required for MCP↔LangGraph
 - `qdrant-client>=1.15.0`, `pydantic>=2.11.0`
+
+Installed deps → `pyproject.toml`. Pins above apply when adding those packages.
 
 ## Code conventions
 - Every LLM output → Pydantic model (via Instructor)
@@ -30,8 +30,10 @@ uv run pytest                    # run tests
 uv run ruff check --fix && uv run ruff format
 ```
 
-## Project status
-- **Day:** D1 ✅ → next: D2 · **Phase:** 1 — Intelligence · **MVP:** 0
+## Current capabilities
+- HN source agent collects AI articles via Tavily (`collectors/tavily.py`)
+- CLI: `uv run python -m pulse.agents.hn_agent` or `uv run python -m pulse.main`
+- LangGraph, Qdrant, digest pipeline — **not implemented yet** (see `docs/architecture.md`)
 
 ## Module layout
 ```
@@ -40,15 +42,18 @@ src/pulse/
   collectors/     — one file per data source; own the fetch + parse logic
   agents/         — thin orchestration wrappers; import from collectors + models, no fetch logic
   display.py      — terminal/CLI output only
-  scripts/        — runnable utilities (generate_test_data, run_digest, etc.)
+  scripts/        — runnable utilities (e.g. generate_test_data)
 tests/            — mirrors src/pulse/ structure
 ```
 New shared types → `models.py`. New data source → `collectors/<name>.py`. Agents never fetch directly.
 
+## Architecture
+- Full C4 rules, container table, Structurizr/Mermaid flows → `docs/architecture.md`
+- When code changes a container, external system, or top-level flow → update `docs/architecture/*` in the same commit; flip `Planned → Implemented` on the element **and every relationship tag** on its edges
+
 ## Where things live
-- Specs: `docs/` — read the relevant file before each day (see `docs/00_AGENT_INSTRUCTIONS.md`)
-- Daily plan: `docs/02_21day_plan.md`
-- Tech stack & compatibility: `docs/04_tech_stack.md`
+- `docs/patterns.md` — agentic pattern table; read when implementing ReAct, HITL, MCP, etc.
+- Python deps → `pyproject.toml` · env vars → `.env.example` · import gotchas → this file
 
 ## Compaction policy
-When compacting, always preserve: the current Day number, the list of modified files, the active deliverable, and any unresolved bug.
+When compacting, preserve the list of modified files and any unresolved bugs.

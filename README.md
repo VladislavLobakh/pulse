@@ -1,8 +1,14 @@
 # PULSE — AI Intelligence & Content Factory
 
-A personal AI system that collects AI news from 5 sources (6th = Deep Track), filters through a personal profile, builds a knowledge graph, and generates a personalized digest + LinkedIn posts. Built over 21 days as an AI Engineering learning project.
+PULSE — personal AI intelligence & content factory: collects AI news from multiple sources, filters through a personal profile, builds a knowledge graph, and produces a digest + LinkedIn drafts.
 
 **KPI:** 1 digest instead of 3h reading · 3 LinkedIn posts/week without stress
+
+## Current capabilities
+
+- HN source agent collects AI articles from Hacker News via Tavily
+- CLI entry points: `uv run python -m pulse.agents.hn_agent` or `uv run python -m pulse.main`
+- Digest, LangGraph orchestration, Qdrant — planned (see `docs/architecture.md`)
 
 ## Setup
 
@@ -12,16 +18,15 @@ uv sync
 
 # 2. Configure environment
 cp .env.example .env
-# fill in TAVILY_API_KEY (required from Day 1)
+# fill in TAVILY_API_KEY (required)
 
-# 3. Run Day 1 agent (once implemented)
+# 3. Collect HN articles
 uv run python -m pulse.agents.hn_agent
-
-# Docker services are added incrementally (Qdrant D6, Langfuse D7, etc.)
-# docker compose up -d
+# or
+uv run python -m pulse.main
 ```
 
-## Daily workflow
+## Development
 
 ```bash
 uv run pytest                              # test
@@ -32,29 +37,30 @@ uv run ruff check --fix && uv run ruff format   # lint + format
 
 ```
 pulse/
-├── CLAUDE.md              # Claude Code context (always loaded)
+├── CLAUDE.md              # AI agent context (always loaded in Cursor)
 ├── .claude/
-│   ├── agents/           # subagents (auto-load by description)
-│   └── skills/           # skills (load on invocation)
-├── docs/                 # specs — read before each day
-├── src/pulse/            # source code
-│   └── agents/           # source agents (D1: hn_agent)
-├── tests/                # pytest
-├── data/                 # test data + golden dataset
-└── pyproject.toml        # single source of truth
+│   └── skills/            # skills (load on invocation)
+├── docs/                  # project documentation
+├── src/pulse/             # source code
+│   ├── collectors/        # fetch + parse per source
+│   └── agents/            # orchestration (hn_agent, …)
+├── tests/                 # pytest
+├── data/                  # test fixtures
+└── pyproject.toml         # Python deps (installed packages)
 ```
 
 ## Documentation
 
 | File | Purpose |
 |---|---|
-| `docs/00_AGENT_INSTRUCTIONS.md` | How to use all artifacts |
-| `docs/01_business_requirements.md` | Persona, pains, KPI, user stories |
-| `docs/02_21day_plan.md` | Day-by-day plan + concepts + questions + adaptability |
-| `docs/03_patterns_reference.md` | 12 agentic patterns + Demo Script |
-| `docs/04_tech_stack.md` | Versions, deps-by-day, Docker, deploy map |
-| `docs/journal.md` | Daily build log (done / deferred / learned) |
+| `CLAUDE.md` | Agent rules, conventions, commands |
+| `docs/architecture.md` | C4 rules, container table, diagram policy |
+| `docs/patterns.md` | Agentic patterns + Pydantic contracts |
+| `docs/architecture/` | Structurizr DSL + Mermaid flows |
+| `.env.example` | Environment variable reference |
 
-## Stack (2026)
+## Stack
 
-uv · Ruff · LangGraph 1.2 · LangChain 1.2 · FastMCP · Qdrant · Mem0 · Langfuse · Modal · Inngest · LightRAG + Neo4j · RAGAS · Next.js
+**Installed** (in `pyproject.toml`): uv · Ruff · pytest · tavily-python · httpx · python-dotenv · faker
+
+**Planned** (see `docs/architecture.md`): LangGraph · LangChain · FastMCP · Qdrant · Mem0 · Langfuse · Modal · Inngest · LightRAG + Neo4j · PostgreSQL · Redis · Next.js dashboard

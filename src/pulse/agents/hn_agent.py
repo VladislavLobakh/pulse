@@ -1,4 +1,4 @@
-"""HN Agent — Day 1: Hacker News via Tavily."""
+"""HN source agent — collects AI articles from Hacker News via Tavily."""
 
 from __future__ import annotations
 

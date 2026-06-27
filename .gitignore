@@ -18,3 +18,6 @@ wheels/
 .DS_Store
 .ruff_cache/
 .cursor/
+
+# Personal planning notes (local only)
+plan/
