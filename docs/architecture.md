@@ -1,7 +1,7 @@
 # PULSE — Architecture (C4)
 
 C4 governance: diagram tools, depth policy, containers, flows, and update rules. Agent coding
-rules (imports, conventions, module layout) → [`CLAUDE.md`](../CLAUDE.md).
+rules (imports, conventions, module layout) → [`AGENTS.md`](../AGENTS.md).
 
 Diagrams live in [`docs/architecture/`](architecture/). Pattern names and Pydantic contracts →
 [`patterns.md`](patterns.md).

@@ -37,7 +37,8 @@ uv run ruff check --fix && uv run ruff format   # lint + format
 
 ```
 pulse/
-├── CLAUDE.md              # AI agent context (always loaded in Cursor)
+├── AGENTS.md              # canonical cross-agent project contract
+├── CLAUDE.md              # Claude runtime bridge (imports AGENTS.md)
 ├── .claude/
 │   └── skills/            # skills (load on invocation)
 ├── docs/                  # project documentation
@@ -53,7 +54,8 @@ pulse/
 
 | File | Purpose |
 |---|---|
-| `CLAUDE.md` | Agent rules, conventions, commands |
+| `AGENTS.md` | Canonical agent rules, conventions, commands |
+| `CLAUDE.md` | Claude runtime bridge (imports `AGENTS.md`) |
 | `docs/architecture.md` | C4 rules, container table, diagram policy |
 | `docs/patterns.md` | Agentic patterns + Pydantic contracts |
 | `docs/architecture/` | Structurizr DSL + Mermaid flows |

@@ -52,7 +52,7 @@ git diff main...HEAD        # branch review
 
 | Always read | Also read if diff touches |
 |---|---|
-| `CLAUDE.md` | |
+| `AGENTS.md` — canonical project contract (rules, repo map, forbidden actions) | |
 | | `docs/architecture.md` — containers, external systems, diagram policy |
 | | `docs/patterns.md` — ReAct, HITL, MCP, etc. |
 
@@ -63,7 +63,9 @@ Read touched **source files**, not just diff hunks.
 **Validate:**
 
 ```bash
-uv run pytest && uv run ruff check
+uv run pytest
+uv run ruff check
+uv run ruff format --check
 ```
 
 Apply [references/checklist.md](references/checklist.md) sections **A–F** in order. Drop findings into the [Finding template](#finding-template). Skip N/A sections — do not invent findings.
@@ -163,8 +165,10 @@ If clean: state that explicitly; still include checklist scores, test gaps, open
 
 ## PULSE gotchas
 
-- Fetch/parse → `collectors/`; `agents/` orchestrate only — boundary violations are **must-fix**
-- Structurizr flip: element tag **and every relationship tag** on its edges
+Review-specific calibration only — the full rules live in their canonical homes; do not restate them here.
+
+- Module boundary (`AGENTS.md` § Core engineering rules): fetch/parse in `collectors/`, `agents/` orchestrate only — boundary violations are **must-fix**
+- Structurizr status flip (`docs/architecture.md`): element tag **and every relationship tag** on its edges — drift on an implemented path is **must-fix**
 - Implemented Mermaid flows must match code: participants, call order, run commands
 - Tavily JSON `null`: `(r.get("key") or "")`, not `.get("key", "")`
 - `fetch_hn_articles()` in `hn_agent`; collector entry is `search_articles()`

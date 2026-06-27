@@ -13,7 +13,7 @@ Walk sections **in order** — blocking areas first. Skip N/A; do not invent fin
 
 ## B. Module layout
 
-Per `CLAUDE.md` § Module layout:
+Per `AGENTS.md` § Repo map + Core engineering rules (canonical — read, do not duplicate):
 
 - [ ] `src/pulse/` for code; `tests/` mirrors structure
 - [ ] Collectors own fetch + parse; agents orchestrate only — **agents never fetch directly**
@@ -22,7 +22,7 @@ Per `CLAUDE.md` § Module layout:
 
 ## C. Conventions
 
-Verify rules in `CLAUDE.md` (read the file — do not duplicate):
+Verify rules in `AGENTS.md` § Core engineering rules (read the file — do not duplicate):
 
 - [ ] Critical imports (`create_agent`, `FastMCP` — not deprecated paths)
 - [ ] Version pins unchanged
@@ -40,9 +40,11 @@ Verify rules in `CLAUDE.md` (read the file — do not duplicate):
 
 ## E. Tests & quality
 
-- [ ] `uv run pytest` passes
-- [ ] `uv run ruff check` passes
-- [ ] New behavior has meaningful tests under `tests/`
+CI-owned checks may be run locally for validation, but do not duplicate CI output as findings.
+Run them when reviewing local/uncommitted changes or when CI status is unavailable.
+If checks are skipped, state why.
+
+- [ ] New behavior has meaningful tests under `tests/` (assert behavior, not just imports)
 
 ## F. Architecture & docs
 
@@ -71,16 +73,4 @@ Run against every draft finding before reporting:
 
 ## Severity & confidence
 
-Must match SKILL.md — use when calibrating findings:
-
-| Severity | When |
-|---|---|
-| **must-fix** | Bug, regression, security, broken boundary, secrets, implemented-path diagram drift |
-| **should-fix** | Clear impact, not blocking |
-| **nice-to-have** | Polish only |
-
-| Confidence | When |
-|---|---|
-| **high** | Quoted evidence from diff |
-| **medium** | Diff + nearby context inspected |
-| **low** | → open question, not must-fix |
+Canonical definitions live in [SKILL.md § Severity & confidence](../SKILL.md#severity--confidence). Calibrate every finding against that table — do not redefine severities or confidence levels here.
