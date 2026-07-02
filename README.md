@@ -39,8 +39,10 @@ uv run ruff check --fix && uv run ruff format   # lint + format
 pulse/
 ├── AGENTS.md              # canonical cross-agent project contract
 ├── CLAUDE.md              # Claude runtime bridge (imports AGENTS.md)
+├── .agents/
+│   └── skills/            # canonical shared agent skills
 ├── .claude/
-│   └── skills/            # skills (load on invocation)
+│   └── skills/            # Claude skill bridges (load on invocation)
 ├── docs/                  # project documentation
 ├── src/pulse/             # source code
 │   ├── collectors/        # fetch + parse per source
@@ -56,7 +58,10 @@ pulse/
 |---|---|
 | `AGENTS.md` | Canonical agent rules, conventions, commands |
 | `CLAUDE.md` | Claude runtime bridge (imports `AGENTS.md`) |
+| `.agents/skills/` | Canonical shared agent skills |
+| `.claude/skills/` | Claude runtime skill bridges that `@` canonical skills |
 | `docs/architecture.md` | C4 rules, container table, diagram policy |
+| `docs/architecture/decisions/` | Structurizr-backed architecture decision log |
 | `docs/patterns.md` | Agentic patterns + Pydantic contracts |
 | `docs/architecture/` | Structurizr DSL + Mermaid flows |
 | `.env.example` | Environment variable reference |

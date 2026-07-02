@@ -16,7 +16,7 @@ When compacting, preserve the list of modified files and any unresolved bugs.
 
 ## Skills
 
-- Claude skills live under `.claude/skills/` (e.g. `code-review/`). Read a skill's `SKILL.md` before using it.
+- Canonical shared skills live under `.agents/skills/`; `.claude/skills/` contains thin Claude runtime bridges that `@` those skills.
 
 ## When instructions conflict or look stale
 

@@ -1,10 +1,12 @@
 # PULSE — Architecture (C4)
 
-C4 governance: diagram tools, depth policy, containers, flows, and update rules. Agent coding
-rules (imports, conventions, module layout) → [`AGENTS.md`](../AGENTS.md).
+C4 governance: diagram tools, depth policy, containers, flows, decisions, and update rules.
+Agent coding rules (imports, conventions, module layout) → [`AGENTS.md`](../AGENTS.md).
 
 Diagrams live in [`docs/architecture/`](architecture/). Pattern names and Pydantic contracts →
 [`patterns.md`](patterns.md).
+Architecture decisions live in [`architecture/decisions/`](architecture/decisions/) and are
+imported into the Structurizr decision log.
 
 ## Current vs target
 
@@ -18,10 +20,11 @@ Diagrams live in [`docs/architecture/`](architecture/). Pattern names and Pydant
 |---|---|---|
 | **Structurizr DSL** | *Structure* — C4 **L1 Context** + **L2 Container** | [`architecture/workspace.dsl`](architecture/workspace.dsl) |
 | **Mermaid** | *Behavior* — sequence & flowchart (pipelines, LangGraph graphs) | [`architecture/flows/*.mmd`](architecture/flows/) |
+| **Structurizr ADRs** | *Decisions* — accepted architecture/tooling rationale | [`architecture/decisions/*.md`](architecture/decisions/) |
 
-The two **never describe the same thing**. Structurizr answers *"what are the parts and how
+These tools **never describe the same thing**. Structurizr DSL answers *"what are the parts and how
 are they wired"*; Mermaid answers *"what happens, in what order"*. A box never appears in
-both as the same fact, so they cannot drift apart.
+both as the same fact, so they cannot drift apart. ADRs answer *"why was this choice made"*.
 
 ## Depth policy
 
@@ -88,6 +91,19 @@ npx @mermaid-js/mermaid-cli -i docs/architecture/flows/hn-collect.mmd -o /tmp/hn
 [`langgraph-orchestrator.mmd`](architecture/flows/langgraph-orchestrator.mmd) ·
 [`content-pipeline.mmd`](architecture/flows/content-pipeline.mmd)
 
+## Decision log (ADRs)
+
+ADRs live in [`architecture/decisions/`](architecture/decisions/) and are imported into
+Structurizr via [`architecture/workspace.dsl`](architecture/workspace.dsl).
+
+Rules:
+- Use `docs/architecture/decision-template.md` for new ADRs.
+- Keep only real ADR Markdown files in `architecture/decisions/`; Structurizr imports every
+  Markdown file there.
+- Write an ADR when choosing or reversing durable architecture/tooling decisions that affect
+  containers, external integrations, top-level flows, storage/LLM contracts, or documentation governance.
+- Do not write ADRs for routine bug fixes, small tests, or personal planning notes.
+
 ## Creation rules
 
 **Structurizr (`workspace.dsl`):**
@@ -105,7 +121,7 @@ npx @mermaid-js/mermaid-cli -i docs/architecture/flows/hn-collect.mmd -o /tmp/hn
 
 ## Update rules
 
-Diagrams are updated **in the same commit as the code** that adds or changes the feature.
+Architecture docs are updated **in the same commit as the code** that adds or changes the feature.
 
 1. **New external integration** (new API/SaaS) → add a `softwareSystem` to the model
    (shows in `Context`) + update the relevant Mermaid flow.
@@ -123,6 +139,8 @@ Diagrams are updated **in the same commit as the code** that adds or changes the
    (`grep -r "<Element Title>" docs/architecture/flows/`).
 6. **Quality gate:** if a Container view passes ~20 elements, revisit the depth policy
    (introduce L3) instead of cramming the view.
+7. **Decision log:** if a change makes or reverses a durable architecture/tooling choice, add a
+   new ADR or supersede the existing one in `architecture/decisions/`.
 
 ## Rendering
 
@@ -131,7 +149,7 @@ Diagrams are updated **in the same commit as the code** that adds or changes the
 ```bash
 docker run --rm -p 8081:8080 \
   -v "$PWD/docs/architecture:/usr/local/structurizr" structurizr/structurizr local
-# open http://localhost:8081 → Context · Container_Now · Container_Target
+# open http://localhost:8081 → Context · Container_Now · Container_Target · Decisions
 ```
 
 Use `structurizr/structurizr local` (not deprecated `structurizr/lite`). If port 8081 is busy:
