@@ -1,6 +1,6 @@
 # PULSE Code Review Checklist
 
-Load during SKILL.md **pass 2**, after `pytest` and `ruff check`.
+Load during SKILL.md **pass 2**, after validation is attempted.
 Apply against the diff and touched source files. Mark each section **Pass / Fail / N/A**.
 
 Walk sections **in order** — blocking areas first. Skip N/A; do not invent findings.
@@ -31,11 +31,11 @@ Verify rules in `AGENTS.md` § Core engineering rules (read the file — do not 
 
 ## D. Correctness & corner cases
 
-- [ ] Happy path matches documented run command / expected output
-- [ ] Missing env vars fail clearly (e.g. `TAVILY_API_KEY not set`)
-- [ ] Empty API responses handled without crash
-- [ ] Threshold / warning logic: correct trigger and order
-- [ ] External errors surfaced or retried appropriately
+- [ ] Happy path matches documented behavior / expected output
+- [ ] Required configuration or env vars fail clearly
+- [ ] Empty or malformed external responses are handled without crash
+- [ ] Thresholds, warnings, and retries are correct where present
+- [ ] External errors are surfaced or retried appropriately
 - [ ] No secrets committed; `.env` not in diff
 
 ## E. Tests & quality
@@ -48,7 +48,8 @@ If checks are skipped, state why.
 
 ## F. Architecture & docs
 
-**N/A** unless `docs/architecture/` changed or a container/external integration landed.
+**N/A** unless architecture docs changed, or code changes a container, external integration,
+top-level flow, or durable architecture/tooling decision.
 Full rules: `docs/architecture.md`.
 
 - [ ] Structurizr = structure (`workspace.dsl`); Mermaid = behavior (`flows/*.mmd`) — no overlap
@@ -70,7 +71,3 @@ Run against every draft finding before reporting:
 - [ ] must-fix findings have **high** confidence
 - [ ] No duplicate findings for the same root cause
 - [ ] No requested rewrite beyond the diff scope
-
-## Severity & confidence
-
-Canonical definitions live in [SKILL.md § Severity & confidence](../SKILL.md#severity--confidence). Calibrate every finding against that table — do not redefine severities or confidence levels here.

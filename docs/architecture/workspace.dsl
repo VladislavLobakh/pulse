@@ -27,6 +27,8 @@ workspace "PULSE" "AI Intelligence & Content Factory — C4 structural model (L1
         # --- The system (L2 Container) ---
         pulse = softwareSystem "PULSE" "Personal AI intelligence & content factory." {
 
+            !adrs decisions adrtools
+
             agentRuntime = container "Agent Runtime" "Collectors, source agents and the LangGraph orchestrator. Source agents (HN/ArXiv/YouTube/Newsletter/Twitter) are in-process components here — not separate containers." "Python / LangGraph" "Implemented"
 
             fastapiCore  = container "FastAPI Core"        "REST entrypoint that invokes agent pipelines on demand." "Modal @asgi_app"       "Planned"

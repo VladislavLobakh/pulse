@@ -57,6 +57,8 @@ Run everything with `uv run`; never activate the venv manually.
 
 When code changes a container, external system, or top-level flow, update the architecture docs in the **same commit**: flip `Planned → Implemented` on the element **and every relationship tag** on its edges. This means both `docs/architecture.md` (the canonical C4 rules and container table) and the supporting files in `docs/architecture/` (Structurizr DSL + Mermaid flows).
 
+When making or reversing a durable architecture/tooling decision, record it as an ADR per `docs/architecture.md`.
+
 ## Docs map
 
 - `docs/architecture.md` — C4 rules, container table, status-flip/grep/parity governance (canonical).
