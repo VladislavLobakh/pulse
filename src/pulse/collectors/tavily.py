@@ -7,7 +7,10 @@ import os
 from dotenv import load_dotenv
 from tavily import TavilyClient
 
+from pulse.logging_config import get_logger
 from pulse.models import Source, SourceItem, SourceItemList
+
+logger = get_logger(__name__)
 
 SUMMARY_MAX_CHARS = 500
 
@@ -42,6 +45,7 @@ def search_articles(
     if not api_key:
         raise RuntimeError("TAVILY_API_KEY not set — check .env")
 
+    logger.debug("Tavily search query=%r source=%s max_results=%d", query, source, max_results)
     client = TavilyClient(api_key=api_key)
     response = client.search(
         query=query,
@@ -49,4 +53,6 @@ def search_articles(
         search_depth="basic",
         include_answer=False,
     )
-    return parse_tavily_results(response.get("results", []), source)
+    raw_results = response.get("results", [])
+    logger.debug("Tavily search query=%r returned %d raw results", query, len(raw_results))
+    return parse_tavily_results(raw_results, source)

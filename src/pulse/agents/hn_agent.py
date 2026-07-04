@@ -11,16 +11,25 @@ code makes changes reviewable/trackable in git, same as the prompts and
 thresholds below. A future source agent (e.g. ArXiv) defines its own
 REASON_MODELS/OBSERVE_MODELS constants without touching this file or
 `react_loop.py`.
+
+Live progress: when `PULSE_VERBOSE=1`, each ReAct step is printed to stderr as
+it happens (via `ReActConfig.on_step`), not only once the whole run finishes
+and the CLI prints the final trace. This is intentionally independent of
+`PULSE_LOG_LEVEL` — DEBUG already prints its own per-node detail via
+`logging`, so tying the live printer to DEBUG too would triple the output for
+the same events (INFO log line + DEBUG detail + live line).
 """
 
 from __future__ import annotations
 
 import functools
+import os
+import sys
 
-from pulse.agents.react_loop import ReActConfig, ReActState, run_react
+from pulse.agents.react_loop import ReActConfig, ReActState, _step_suffix, run_react
 from pulse.collectors.tavily import search_articles
 from pulse.llm import complete_structured
-from pulse.models import ReActResult, Source, SourceItemList
+from pulse.models import ReActResult, Source, SourceItemList, TraceEvent
 
 HN_QUERY = "AI LLM site:news.ycombinator.com"
 MAX_RESULTS = 10
@@ -85,6 +94,15 @@ def _build_score_payload(items: SourceItemList) -> list[dict]:
     ]
 
 
+def _live_progress_enabled() -> bool:
+    return os.getenv("PULSE_VERBOSE") == "1"
+
+
+def _print_step(event: TraceEvent) -> None:
+    line = f"[live] {event.kind.capitalize()}: {event.message}{_step_suffix(event)}"
+    print(line, file=sys.stderr)
+
+
 def _config() -> ReActConfig:
     return ReActConfig(
         search_fn=_search,
@@ -98,6 +116,7 @@ def _config() -> ReActConfig:
         score_threshold=SCORE_THRESHOLD,
         max_iterations=MAX_ITERATIONS,
         recursion_limit=RECURSION_LIMIT,
+        on_step=_print_step if _live_progress_enabled() else None,
     )
 
 

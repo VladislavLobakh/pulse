@@ -13,7 +13,15 @@ import pytest
 
 import pulse.agents.hn_agent as hn_agent
 import pulse.llm as llm_module
-from pulse.models import ReasonDecision, Source, SourceBatchScore, SourceItem, StopReason, TraceKind
+from pulse.models import (
+    ReasonDecision,
+    Source,
+    SourceBatchScore,
+    SourceItem,
+    StopReason,
+    TraceEvent,
+    TraceKind,
+)
 
 ARTICLE = SourceItem(
     title="LangGraph 2.0 released",
@@ -31,6 +39,9 @@ def _api_key(monkeypatch):
     # are plain code constants now, so no model env vars are needed here.
     monkeypatch.setattr(llm_module, "load_dotenv", lambda *a, **k: None)
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-test")
+    # Keep live-progress wiring deterministic regardless of the host shell.
+    monkeypatch.delenv("PULSE_LOG_LEVEL", raising=False)
+    monkeypatch.delenv("PULSE_VERBOSE", raising=False)
 
 
 def test_config_wires_hn_business_logic() -> None:
@@ -48,6 +59,62 @@ def test_config_wires_hn_business_logic() -> None:
     assert config.observe_llm.keywords["models"] == hn_agent.OBSERVE_MODELS
     assert config.build_reason_context is hn_agent._build_reason_context
     assert config.build_score_payload is hn_agent._build_score_payload
+    assert config.on_step is None
+
+
+def test_live_progress_disabled_by_default() -> None:
+    assert hn_agent._live_progress_enabled() is False
+
+
+def test_debug_log_level_alone_does_not_enable_live_progress(monkeypatch) -> None:
+    """Live progress is deliberately independent of PULSE_LOG_LEVEL: DEBUG
+    already prints its own per-node detail via `logging`, so tying the live
+    printer to DEBUG too would triple the output for the same events."""
+    monkeypatch.setenv("PULSE_LOG_LEVEL", "DEBUG")
+    assert hn_agent._live_progress_enabled() is False
+
+
+def test_live_progress_enabled_by_verbose_flag(monkeypatch) -> None:
+    monkeypatch.setenv("PULSE_VERBOSE", "1")
+    assert hn_agent._live_progress_enabled() is True
+
+
+def test_config_wires_on_step_printer_when_live_progress_enabled(monkeypatch) -> None:
+    monkeypatch.setenv("PULSE_VERBOSE", "1")
+
+    config = hn_agent._config()
+
+    assert config.on_step is hn_agent._print_step
+
+
+def test_print_step_writes_to_stderr(capsys) -> None:
+    event = TraceEvent(kind=TraceKind.REASON, message="thinking")
+
+    hn_agent._print_step(event)
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Reason: thinking" in captured.err
+
+
+def test_print_step_surfaces_query_when_not_already_in_message(capsys) -> None:
+    event = TraceEvent(kind=TraceKind.REASON, message="thinking", query="AI LLM refined")
+
+    hn_agent._print_step(event)
+
+    assert "query='AI LLM refined'" in capsys.readouterr().err
+
+
+def test_print_step_does_not_duplicate_query_already_in_message(capsys) -> None:
+    event = TraceEvent(
+        kind=TraceKind.ACT,
+        message='tavily_hn("AI LLM refined") -> 3 results',
+        query="AI LLM refined",
+    )
+
+    hn_agent._print_step(event)
+
+    assert capsys.readouterr().err.count("AI LLM refined") == 1
 
 
 def test_search_fn_calls_tavily_with_hacker_news_source(monkeypatch) -> None:

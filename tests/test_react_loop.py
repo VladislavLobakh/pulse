@@ -192,6 +192,45 @@ def test_reason_llm_and_observe_llm_are_independent_callables() -> None:
     assert observe_calls == [SourceBatchScore]
 
 
+def test_on_step_called_for_every_trace_event_as_it_happens() -> None:
+    """on_step must fire per step during the run (live progress), not only be
+    derivable from the final trace — so it should be called once per event,
+    in the same order the trace ends up in."""
+    search = _make_search_fn([[ITEM]])
+    llm = _make_structured_llm(["t1"], [SourceBatchScore(relevance=0.9, novelty=0.9, quality=0.9)])
+    seen_events = []
+
+    config = _config(search, llm, on_step=seen_events.append)
+    result = react_loop.run_react(config, query="q", max_results=10)
+
+    assert seen_events == result.trace
+    assert [e.kind for e in seen_events] == [TraceKind.REASON, TraceKind.ACT, TraceKind.OBSERVE]
+
+
+def test_on_step_called_on_no_results_path() -> None:
+    search = _make_search_fn([[]])
+    llm = _make_structured_llm(["t1"], [SourceBatchScore(relevance=0.9, novelty=0.9, quality=0.9)])
+    seen_events = []
+
+    config = _config(search, llm, on_step=seen_events.append)
+    result = react_loop.run_react(config, query="q", max_results=10)
+
+    assert seen_events == result.trace
+    assert seen_events[-1].kind == TraceKind.OBSERVE
+    assert "no results" in seen_events[-1].message
+
+
+def test_on_step_defaults_to_none_and_is_optional() -> None:
+    search = _make_search_fn([[ITEM]])
+    llm = _make_structured_llm(["t1"], [SourceBatchScore(relevance=0.9, novelty=0.9, quality=0.9)])
+
+    config = _config(search, llm)
+
+    assert config.on_step is None
+    # must not raise even though no callback was supplied
+    react_loop.run_react(config, query="q", max_results=10)
+
+
 def test_reason_and_score_builders_are_invoked_generically() -> None:
     search = _make_search_fn([[ITEM]])
     llm = _make_structured_llm(["t1"], [SourceBatchScore(relevance=0.9, novelty=0.9, quality=0.9)])
