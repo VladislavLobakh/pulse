@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: Read-only code review for git diffs — correctness, PULSE architecture, conventions, tests, docs. Use when asked for /code-review, PR/branch review, audit, feedback on a diff, or pre-merge checks.
+description: Read-only code review for git diffs — correctness, PULSE architecture, conventions, tests, docs. Use when asked for /impl-review, PR/branch review, audit, feedback on a diff, or pre-merge checks.
 disable-model-invocation: true
 ---
 
@@ -62,7 +62,7 @@ uv run ruff check
 uv run ruff format --check
 ```
 
-Apply `.agents/skills/code-review/references/checklist.md` sections **A–F** in order. Drop findings into the [Finding template](#finding-template). Skip N/A sections — do not invent findings.
+Apply `.agents/skills/impl-review/references/checklist.md` sections **A–F** in order. Drop findings into the [Finding template](#finding-template). Skip N/A sections — do not invent findings.
 
 Priority: blocking risks (correctness, security, module boundaries, secrets) before style or polish.
 

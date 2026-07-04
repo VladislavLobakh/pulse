@@ -14,7 +14,7 @@ workspace "PULSE" "AI Intelligence & Content Factory — C4 structural model (L1
 
         # --- External systems (L1 Context) ---
         tavily       = softwareSystem "Tavily"            "Web/search API for article discovery."          "External,Implemented"
-        openrouter   = softwareSystem "OpenRouter"        "LLM gateway (Claude / GPT / Gemini fallback)."  "External,Planned"
+        openrouter   = softwareSystem "OpenRouter"        "LLM gateway (Claude / GPT / Gemini fallback)."  "External,Implemented"
         arxiv        = softwareSystem "ArXiv"             "Research paper source."                          "External,Planned"
         youtube      = softwareSystem "YouTube"           "Video transcripts source."                       "External,Planned"
         newsletters  = softwareSystem "RSS Newsletters"   "Latent Space, Simon Willison, etc."              "External,Planned"
@@ -49,7 +49,7 @@ workspace "PULSE" "AI Intelligence & Content Factory — C4 structural model (L1
         user -> pulse.dashboard    "Reads digest, approves drafts"            "HTTPS"           "Planned"
 
         pulse.agentRuntime -> tavily       "Searches articles via"            "HTTPS / SDK"     "Implemented"
-        pulse.agentRuntime -> openrouter   "Calls LLM via"                    "HTTPS"           "Planned"
+        pulse.agentRuntime -> openrouter   "Calls LLM via"                    "HTTPS"           "Implemented"
         pulse.agentRuntime -> arxiv        "Fetches papers from"              "HTTPS"           "Planned"
         pulse.agentRuntime -> youtube      "Fetches transcripts from"         "HTTPS"           "Planned"
         pulse.agentRuntime -> newsletters  "Fetches feeds from"               "RSS"             "Planned"

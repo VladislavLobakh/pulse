@@ -10,7 +10,8 @@ imported into the Structurizr decision log.
 
 ## Current vs target
 
-**Implemented today:** Agent Runtime (HN collector via Tavily), Tavily external integration.
+**Implemented today:** Agent Runtime (HN ReAct loop — reason → act → observe — over Tavily,
+scored and gated via OpenRouter), Tavily and OpenRouter external integrations.
 
 **Target (Planned):** remaining containers and flows in `Container_Target` view — see table below.
 
@@ -53,7 +54,7 @@ Tavily, OpenRouter, ArXiv, YouTube, RSS Newsletters, Twitter/X, Telegram, Linked
 
 | Container | Tech | Local / Deploy | Status |
 |---|---|---|---|
-| Agent Runtime (collectors + agents + orchestrator) | Python / LangGraph | `uv run` (CLI) | **Implemented** (HN collector only) |
+| Agent Runtime (collectors + agents + orchestrator) | Python / LangGraph | `uv run` (CLI) | **Implemented** (HN ReAct loop only) |
 | FastAPI Core | Modal `@asgi_app` | `https://pulse--api.modal.run` | Planned |
 | FastMCP Server | Modal `@web_endpoint` | `https://pulse--mcp.modal.run` | Planned |
 | Digest Scheduler | Modal `@cron` 08:00 | daily 08:00 UTC | Planned |

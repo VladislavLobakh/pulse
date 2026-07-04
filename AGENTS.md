@@ -41,7 +41,7 @@ Run everything with `uv run`; never activate the venv manually.
 - **Imports:** `from langchain.agents import create_agent` (NOT `langgraph.prebuilt.create_react_agent`); `from fastmcp import FastMCP` (NOT `mcp.server.fastmcp`).
 - **Version pins (do not change):** `langgraph>=1.2.0` (NOT 1.0.x), `langchain-mcp-adapters>=0.3.0`, `qdrant-client>=1.15.0`, `pydantic>=2.11.0`. Pins apply when adding those packages; installed deps live in `pyproject.toml`.
 - Every LLM output → a Pydantic model (via Instructor). Plain domain data structures may remain dataclasses; do not convert existing domain dataclasses to Pydantic unless they become LLM output contracts.
-- Every agent graph → `graph.compile(recursion_limit=10)`.
+- Every agent graph → `recursion_limit=10` via runtime `config=` (not `compile()`).
 - Qdrant: always `upsert`, never `delete`+`recreate`.
 - Agents never fetch directly — fetch/parse logic lives in `collectors/`.
 

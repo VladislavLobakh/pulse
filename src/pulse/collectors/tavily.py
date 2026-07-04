@@ -7,14 +7,18 @@ import os
 from dotenv import load_dotenv
 from tavily import TavilyClient
 
-from pulse.models import SUMMARY_MAX_CHARS, Article, ArticleList, Source
+from pulse.models import Source, SourceItem, SourceItemList
+
+SUMMARY_MAX_CHARS = 500
 
 
-def parse_tavily_results(raw_results: list[dict], source: Source) -> ArticleList:
-    articles = []
+def parse_tavily_results(raw_results: list[dict], source: Source) -> SourceItemList:
+    items = []
     for r in raw_results:
-        articles.append(
-            Article(
+        items.append(
+            # score: Tavily relevance.
+            # summary: Tavily "content", truncated to SUMMARY_MAX_CHARS.
+            SourceItem(
                 title=r.get("title") or "Untitled",
                 url=r.get("url") or "",
                 score=float(r.get("score") or 0.0),
@@ -23,7 +27,7 @@ def parse_tavily_results(raw_results: list[dict], source: Source) -> ArticleList
                 published_date=r.get("published_date") or "",
             )
         )
-    return articles
+    return items
 
 
 def search_articles(
@@ -31,7 +35,7 @@ def search_articles(
     source: Source,
     *,
     max_results: int = 10,
-) -> ArticleList:
+) -> SourceItemList:
     load_dotenv()
 
     api_key = os.getenv("TAVILY_API_KEY")
