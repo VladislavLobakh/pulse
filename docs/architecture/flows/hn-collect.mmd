@@ -4,6 +4,9 @@ title: "HN collect flow (current / Implemented)"
 sequenceDiagram
     actor User
     participant CLI as CLI entry (hn_agent / main)
+    participant HN as hn_agent (HN business logic: prompts, query, thresholds)
+    participant Graph as react_loop StateGraph (generic engine)
+    participant LLM as llm.complete_structured (OpenRouter)
     participant Col as collectors.tavily
     participant API as Tavily API
     participant Disp as display
@@ -11,14 +14,37 @@ sequenceDiagram
     alt pulse.agents.hn_agent
         User->>CLI: uv run python -m pulse.agents.hn_agent
     else pulse.main
-        User->>CLI: uv run python -m pulse.main
+        User->>CLI: uv run python -m pulse.main ["query"]
     end
-    CLI->>CLI: fetch_hn_articles()
-    CLI->>Col: search_articles(query, Source.HACKER_NEWS)
-    Col->>API: TavilyClient.search("AI LLM site:news.ycombinator.com")
-    API-->>Col: raw results[]
-    Col->>Col: parse_tavily_results() → ArticleList
-    Col-->>CLI: ArticleList
-    CLI->>Disp: warn_if_below_minimum(articles, min_count)
-    CLI->>Disp: print_articles(articles)
-    Disp-->>User: N articles (title, url, score, summary)
+    CLI->>HN: run_hn_react(query)
+    HN->>HN: reason_llm = partial(complete_structured, models=REASON_MODELS)
+    HN->>HN: observe_llm = partial(complete_structured, models=OBSERVE_MODELS)
+    HN->>Graph: run_react(ReActConfig(search_fn, reason_llm, observe_llm, prompts, ...), query)
+
+    loop reason -> act -> observe (until done or max_iterations)
+        Graph->>LLM: config.reason_llm(...) -> ReasonDecision(thought, query)
+        LLM-->>Graph: ReasonDecision
+        Graph->>HN: act_node: config.search_fn(query, max_results)
+        HN->>Col: search_articles(query, Source.HACKER_NEWS)
+        Col->>API: TavilyClient.search(query)
+        API-->>Col: raw results[]
+        Col->>Col: parse_tavily_results() -> SourceItemList
+        Col-->>HN: SourceItemList
+        HN-->>Graph: SourceItemList
+        alt zero items
+            Graph->>Graph: no_results_node: stop_reason = NO_RESULTS -> END
+        else one or more items
+            Graph->>HN: config.build_score_payload(items)
+            HN-->>Graph: source-shaped payload
+            Graph->>LLM: config.observe_llm(...) -> SourceBatchScore(relevance, novelty, quality)
+            LLM-->>Graph: SourceBatchScore
+            Graph->>Graph: best_score, iteration++, done? (score_threshold / max_iterations)
+        end
+    end
+
+    Graph-->>HN: ReActResult(items, trace, stop_reason)
+    HN-->>CLI: ReActResult
+    CLI->>Disp: print_trace(trace) (Reason/Act/Observe lines)
+    CLI->>Disp: warn_if_below_minimum(items, min_count)
+    CLI->>Disp: print_articles(items)
+    Disp-->>User: N articles (title, url, score, summary) + stop reason

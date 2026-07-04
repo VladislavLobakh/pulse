@@ -5,7 +5,7 @@ Behavioral detail lives in [`docs/architecture/flows/*.mmd`](architecture/flows/
 | Pattern | Role in PULSE | Pydantic model | Flow |
 |---|---|---|---|
 | Tool use | Source agents call collectors / MCP tools | `ToolCall` | [`hn-collect.mmd`](architecture/flows/hn-collect.mmd) |
-| ReAct loop | Source agent: search → read → evaluate → decide | `ReactStep` | [`langgraph-orchestrator.mmd`](architecture/flows/langgraph-orchestrator.mmd) |
+| ReAct loop | Generic engine (`agents/react_loop.py`): reason → act → observe → decide, driven per-source by a `ReActConfig` (**Implemented**, HN is the first source wired in via `agents/hn_agent.py`) | `ReasonDecision`, `SourceBatchScore` | [`hn-collect.mmd`](architecture/flows/hn-collect.mmd) |
 | Plan-and-Execute | Planning agent before scheduled digest runs | `ExecutionPlan` | [`daily-digest.mmd`](architecture/flows/daily-digest.mmd) |
 | Routing | RAG router: live / archive / graph / research modes | `RouteDecision` | [`langgraph-orchestrator.mmd`](architecture/flows/langgraph-orchestrator.mmd) |
 | Self-correction | Critique loop on digest and LinkedIn drafts (max 3) | `CritiqueResult` | [`content-pipeline.mmd`](architecture/flows/content-pipeline.mmd) |

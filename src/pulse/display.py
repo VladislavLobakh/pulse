@@ -4,25 +4,32 @@ from __future__ import annotations
 
 import sys
 
-from pulse.models import ArticleList
+from pulse.models import SourceItemList, TraceEvent
 
 
-def warn_if_below_minimum(articles: ArticleList, min_count: int) -> None:
-    if len(articles) < min_count:
+def print_trace(trace: list[TraceEvent]) -> None:
+    print("\n=== Reason / Act / Observe trace ===\n")
+    for event in trace:
+        print(f"{event.kind.capitalize()}: {event.message}")
+    print()
+
+
+def warn_if_below_minimum(items: SourceItemList, min_count: int) -> None:
+    if len(items) < min_count:
         print(
-            f"WARNING: only {len(articles)} articles returned (expected {min_count}+)",
+            f"WARNING: only {len(items)} articles returned (expected {min_count}+)",
             file=sys.stderr,
         )
 
 
-def print_articles(articles: ArticleList) -> None:
-    print(f"\n=== PULSE — {len(articles)} articles ===\n")
-    for i, article in enumerate(articles, 1):
-        print(f"{i}. {article.title}")
-        print(f"   source: {article.source}")
-        print(f"   url:   {article.url}")
-        print(f"   score: {article.score:.3f}")
-        if article.published_date:
-            print(f"   date:  {article.published_date}")
-        print(f"   summary: {article.summary}")
+def print_articles(items: SourceItemList) -> None:
+    print(f"\n=== PULSE — {len(items)} articles ===\n")
+    for i, item in enumerate(items, 1):
+        print(f"{i}. {item.title}")
+        print(f"   source: {item.source}")
+        print(f"   url:   {item.url}")
+        print(f"   score: {item.score:.3f}")
+        if item.published_date:
+            print(f"   date:  {item.published_date}")
+        print(f"   summary: {item.summary}")
         print("---")

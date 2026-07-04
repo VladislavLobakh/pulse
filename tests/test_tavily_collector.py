@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pulse.collectors.tavily import parse_tavily_results
-from pulse.models import Article, Source
+from pulse.models import Source, SourceItem
 
 MOCK_RAW_RESULTS = [
     {
@@ -31,7 +31,7 @@ def test_parse_tavily_results_returns_correct_count() -> None:
 def test_parse_tavily_results_returns_article_instances() -> None:
     articles = parse_tavily_results(MOCK_RAW_RESULTS, Source.HACKER_NEWS)
     for a in articles:
-        assert isinstance(a, Article)
+        assert isinstance(a, SourceItem)
 
 
 def test_parse_tavily_results_sets_source() -> None:
