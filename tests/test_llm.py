@@ -90,7 +90,9 @@ def test_transient_error_then_success_retries(monkeypatch) -> None:
     fake = FakeClient([_error(litellm.RateLimitError), Dummy(value="ok")])
     monkeypatch.setattr(llm_module.instructor, "from_litellm", lambda *a, **k: fake)
 
-    result = llm_module.complete_structured(messages=[], models=MODELS, response_model=Dummy)
+    result = llm_module.complete_structured(
+        messages=[], models=MODELS, response_model=Dummy, temperature=0.1, max_tokens=500
+    )
 
     assert result.value == "ok"
     assert fake.completions.calls == 2
@@ -101,7 +103,9 @@ def test_fallback_chain_exhausted_propagates(monkeypatch) -> None:
     monkeypatch.setattr(llm_module.instructor, "from_litellm", lambda *a, **k: fake)
 
     with pytest.raises(RuntimeError, match="exhausted"):
-        llm_module.complete_structured(messages=[], models=MODELS, response_model=Dummy)
+        llm_module.complete_structured(
+            messages=[], models=MODELS, response_model=Dummy, temperature=0.1, max_tokens=500
+        )
 
     assert fake.completions.calls == 2
 
@@ -117,7 +121,9 @@ def test_missing_api_key_fails_fast(monkeypatch) -> None:
     monkeypatch.setattr(llm_module.instructor, "from_litellm", _boom)
 
     with pytest.raises(RuntimeError, match="OPENROUTER_API_KEY"):
-        llm_module.complete_structured(messages=[], models=MODELS, response_model=Dummy)
+        llm_module.complete_structured(
+            messages=[], models=MODELS, response_model=Dummy, temperature=0.1, max_tokens=500
+        )
 
     assert called["n"] == 0
 
@@ -130,7 +136,9 @@ def test_transient_error_exhausted_propagates_without_fallback(monkeypatch) -> N
     monkeypatch.setattr(llm_module.instructor, "from_litellm", lambda *a, **k: fake)
 
     with pytest.raises(litellm.RateLimitError):
-        llm_module.complete_structured(messages=[], models=MODELS, response_model=Dummy)
+        llm_module.complete_structured(
+            messages=[], models=MODELS, response_model=Dummy, temperature=0.1, max_tokens=500
+        )
 
     assert fake.completions.calls == 3
 
@@ -145,7 +153,9 @@ def test_validation_error_falls_back_to_next_model(monkeypatch) -> None:
     )
     monkeypatch.setattr(llm_module.instructor, "from_litellm", lambda *a, **k: fake)
 
-    result = llm_module.complete_structured(messages=[], models=MODELS, response_model=Dummy)
+    result = llm_module.complete_structured(
+        messages=[], models=MODELS, response_model=Dummy, temperature=0.1, max_tokens=500
+    )
 
     assert result.value == "ok"
     assert fake.completions.calls == 2
@@ -158,7 +168,9 @@ def test_wrapped_fallback_error_still_falls_back_to_next_model(monkeypatch) -> N
     fake = FakeClient([_wrapped(_error(litellm.NotFoundError)), Dummy(value="ok")])
     monkeypatch.setattr(llm_module.instructor, "from_litellm", lambda *a, **k: fake)
 
-    result = llm_module.complete_structured(messages=[], models=MODELS, response_model=Dummy)
+    result = llm_module.complete_structured(
+        messages=[], models=MODELS, response_model=Dummy, temperature=0.1, max_tokens=500
+    )
 
     assert result.value == "ok"
     assert fake.completions.calls == 2
@@ -169,7 +181,9 @@ def test_wrapped_fail_fast_error_propagates_without_fallback(monkeypatch) -> Non
     monkeypatch.setattr(llm_module.instructor, "from_litellm", lambda *a, **k: fake)
 
     with pytest.raises(litellm.AuthenticationError):
-        llm_module.complete_structured(messages=[], models=MODELS, response_model=Dummy)
+        llm_module.complete_structured(
+            messages=[], models=MODELS, response_model=Dummy, temperature=0.1, max_tokens=500
+        )
 
     assert fake.completions.calls == 1
 
@@ -178,7 +192,9 @@ def test_wrapped_transient_error_retries_in_place(monkeypatch) -> None:
     fake = FakeClient([_wrapped(_error(litellm.RateLimitError)), Dummy(value="ok")])
     monkeypatch.setattr(llm_module.instructor, "from_litellm", lambda *a, **k: fake)
 
-    result = llm_module.complete_structured(messages=[], models=MODELS, response_model=Dummy)
+    result = llm_module.complete_structured(
+        messages=[], models=MODELS, response_model=Dummy, temperature=0.1, max_tokens=500
+    )
 
     assert result.value == "ok"
     assert fake.completions.calls == 2
@@ -198,7 +214,9 @@ def test_finish_reason_error_provider_unavailable_falls_back_to_next_model(monke
     )
     monkeypatch.setattr(llm_module.instructor, "from_litellm", lambda *a, **k: fake)
 
-    result = llm_module.complete_structured(messages=[], models=MODELS, response_model=Dummy)
+    result = llm_module.complete_structured(
+        messages=[], models=MODELS, response_model=Dummy, temperature=0.1, max_tokens=500
+    )
 
     assert result.value == "ok"
     assert fake.completions.calls == 2
@@ -215,7 +233,9 @@ def test_finish_reason_error_exhausted_raises_provider_completion_error(monkeypa
     monkeypatch.setattr(llm_module.instructor, "from_litellm", lambda *a, **k: fake)
 
     with pytest.raises(RuntimeError, match="exhausted"):
-        llm_module.complete_structured(messages=[], models=MODELS, response_model=Dummy)
+        llm_module.complete_structured(
+            messages=[], models=MODELS, response_model=Dummy, temperature=0.1, max_tokens=500
+        )
 
     assert fake.completions.calls == 2
 
@@ -227,7 +247,9 @@ def test_finish_reason_error_payment_required_fails_fast(monkeypatch) -> None:
     monkeypatch.setattr(llm_module.instructor, "from_litellm", lambda *a, **k: fake)
 
     with pytest.raises(llm_module.ProviderBillingError):
-        llm_module.complete_structured(messages=[], models=MODELS, response_model=Dummy)
+        llm_module.complete_structured(
+            messages=[], models=MODELS, response_model=Dummy, temperature=0.1, max_tokens=500
+        )
 
     assert fake.completions.calls == 1
 
@@ -244,7 +266,9 @@ def test_finish_reason_error_without_structured_fields_is_generic_completion_err
     fake = FakeClient([garbage_response, (Dummy(value="ok"), _completion())])
     monkeypatch.setattr(llm_module.instructor, "from_litellm", lambda *a, **k: fake)
 
-    result = llm_module.complete_structured(messages=[], models=MODELS, response_model=Dummy)
+    result = llm_module.complete_structured(
+        messages=[], models=MODELS, response_model=Dummy, temperature=0.1, max_tokens=500
+    )
 
     assert result.value == "ok"
     assert fake.completions.calls == 2
@@ -259,7 +283,9 @@ def test_api_error_status_402_reclassified_as_billing_fail_fast(monkeypatch) -> 
     monkeypatch.setattr(llm_module.instructor, "from_litellm", lambda *a, **k: fake)
 
     with pytest.raises(llm_module.ProviderBillingError):
-        llm_module.complete_structured(messages=[], models=MODELS, response_model=Dummy)
+        llm_module.complete_structured(
+            messages=[], models=MODELS, response_model=Dummy, temperature=0.1, max_tokens=500
+        )
 
     assert fake.completions.calls == 1
 
@@ -268,7 +294,9 @@ def test_api_error_status_502_reclassified_as_fallback(monkeypatch) -> None:
     fake = FakeClient([_api_error(502), Dummy(value="ok")])
     monkeypatch.setattr(llm_module.instructor, "from_litellm", lambda *a, **k: fake)
 
-    result = llm_module.complete_structured(messages=[], models=MODELS, response_model=Dummy)
+    result = llm_module.complete_structured(
+        messages=[], models=MODELS, response_model=Dummy, temperature=0.1, max_tokens=500
+    )
 
     assert result.value == "ok"
     assert fake.completions.calls == 2
@@ -286,7 +314,9 @@ def test_call_model_passes_request_timeout(monkeypatch) -> None:
 
     fake.completions.create_with_completion = _spy
 
-    llm_module.complete_structured(messages=[], models=MODELS, response_model=Dummy)
+    llm_module.complete_structured(
+        messages=[], models=MODELS, response_model=Dummy, temperature=0.1, max_tokens=500
+    )
 
     assert seen_kwargs["timeout"] == llm_module._REQUEST_TIMEOUT_SECONDS
 
@@ -308,7 +338,9 @@ def test_call_model_limits_instructor_internal_retries(monkeypatch) -> None:
 
     fake.completions.create_with_completion = _spy
 
-    llm_module.complete_structured(messages=[], models=MODELS, response_model=Dummy)
+    llm_module.complete_structured(
+        messages=[], models=MODELS, response_model=Dummy, temperature=0.1, max_tokens=500
+    )
 
     assert seen_kwargs["max_retries"] == 1
 
@@ -328,7 +360,9 @@ def test_complete_structured_configures_json_mode_and_global_timeout(monkeypatch
     monkeypatch.setattr(llm_module.instructor, "from_litellm", _fake_from_litellm)
     monkeypatch.setattr(llm_module.litellm, "request_timeout", None)
 
-    llm_module.complete_structured(messages=[], models=MODELS, response_model=Dummy)
+    llm_module.complete_structured(
+        messages=[], models=MODELS, response_model=Dummy, temperature=0.1, max_tokens=500
+    )
 
     assert seen["mode"] is llm_module.instructor.Mode.JSON
     assert llm_module.litellm.request_timeout == llm_module._REQUEST_TIMEOUT_SECONDS
@@ -339,6 +373,8 @@ def test_call_model_logs_elapsed_time(monkeypatch, caplog) -> None:
     monkeypatch.setattr(llm_module.instructor, "from_litellm", lambda *a, **k: fake)
 
     with caplog.at_level("DEBUG", logger=llm_module.logger.name):
-        llm_module.complete_structured(messages=[], models=MODELS, response_model=Dummy)
+        llm_module.complete_structured(
+            messages=[], models=MODELS, response_model=Dummy, temperature=0.1, max_tokens=500
+        )
 
     assert any("completed in" in record.getMessage() for record in caplog.records)

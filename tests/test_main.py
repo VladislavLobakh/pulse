@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import pytest
+
 import pulse.main as main_module
-from pulse.models import ReActResult, Source, SourceItem, StopReason, TraceEvent, TraceKind
+from pulse.models import Source, SourceItem
+from pulse.patterns.react import ReActResult, StopReason, TraceEvent, TraceKind
 
 ARTICLE = SourceItem(
     title="LangGraph 2.0 released",
@@ -39,22 +42,14 @@ def test_main_parses_query_argument_and_passes_it_through(monkeypatch, capsys) -
     assert "Total: 1 articles collected." in out
 
 
-def test_main_defaults_to_hn_query_when_no_argument_given(monkeypatch) -> None:
-    seen_queries = []
+def test_main_requires_a_query_argument(capsys) -> None:
+    """The query always comes from the caller — there is no built-in default
+    topic, so invoking the CLI without one is a usage error."""
+    with pytest.raises(SystemExit) as excinfo:
+        main_module.main([])
 
-    def _fake_run_hn_react(query):
-        seen_queries.append(query)
-        return ReActResult(
-            items=[],
-            stop_reason=StopReason.NO_RESULTS,
-            trace=[],
-        )
-
-    monkeypatch.setattr(main_module, "run_hn_react", _fake_run_hn_react)
-
-    main_module.main([])
-
-    assert seen_queries == [main_module.HN_QUERY]
+    assert excinfo.value.code == 2
+    assert "query" in capsys.readouterr().err
 
 
 def test_main_warns_when_below_minimum_articles(monkeypatch, capsys) -> None:
@@ -63,7 +58,7 @@ def test_main_warns_when_below_minimum_articles(monkeypatch, capsys) -> None:
 
     monkeypatch.setattr(main_module, "run_hn_react", _fake_run_hn_react)
 
-    main_module.main([])
+    main_module.main(["some query"])
 
     err = capsys.readouterr().err
     assert "WARNING" in err

@@ -1,8 +1,8 @@
-"""Tests for pulse.agents.hn_agent — the HN-specific business logic only.
+"""Tests for pulse.agents.hn — the HN-specific business logic only.
 
 Generic ReAct engine mechanics (retry/stop/trace/no-results handling) are
-covered by tests/test_react_loop.py against a synthetic config. These tests
-only check that hn_agent builds the right Hacker News business logic
+covered by tests/test_react.py against a synthetic config. These tests
+only check that the HN agent builds the right Hacker News business logic
 (collector binding, prompts, reason-context wording, score payload shape,
 thresholds) and wires it into the engine correctly.
 """
@@ -11,13 +11,12 @@ from __future__ import annotations
 
 import pytest
 
-import pulse.agents.hn_agent as hn_agent
+import pulse.agents.hn as hn
 import pulse.llm as llm_module
-from pulse.models import (
+from pulse.models import Source, SourceItem
+from pulse.patterns.react import (
     ReasonDecision,
-    Source,
     SourceBatchScore,
-    SourceItem,
     StopReason,
     TraceEvent,
     TraceKind,
@@ -45,25 +44,28 @@ def _api_key(monkeypatch):
 
 
 def test_config_wires_hn_business_logic() -> None:
-    config = hn_agent._config()
+    config = hn._config()
 
-    assert config.score_threshold == hn_agent.SCORE_THRESHOLD
-    assert config.max_iterations == hn_agent.MAX_ITERATIONS
-    assert config.recursion_limit == hn_agent.RECURSION_LIMIT
-    assert config.action_name == hn_agent.ACTION_NAME
-    assert config.reason_system_prompt == hn_agent.REASON_SYSTEM_PROMPT
-    assert config.observe_system_prompt == hn_agent.OBSERVE_SYSTEM_PROMPT
-    assert config.reason_llm.func is hn_agent.complete_structured
-    assert config.reason_llm.keywords["models"] == hn_agent.REASON_MODELS
-    assert config.observe_llm.func is hn_agent.complete_structured
-    assert config.observe_llm.keywords["models"] == hn_agent.OBSERVE_MODELS
-    assert config.build_reason_context is hn_agent._build_reason_context
-    assert config.build_score_payload is hn_agent._build_score_payload
+    assert config.score_threshold == hn.SCORE_THRESHOLD
+    assert config.max_iterations == hn.MAX_ITERATIONS
+    assert config.recursion_limit == hn.RECURSION_LIMIT
+    assert config.action_name == hn.ACTION_NAME
+    assert config.reason_system_prompt == hn.REASON_SYSTEM_PROMPT
+    assert config.observe_system_prompt == hn.OBSERVE_SYSTEM_PROMPT
+    assert config.reason_llm.func is hn.complete_structured
+    assert config.reason_llm.keywords["models"] == hn.REASON_MODELS
+    assert config.observe_llm.func is hn.complete_structured
+    assert config.observe_llm.keywords["models"] == hn.OBSERVE_MODELS
+    for llm in (config.reason_llm, config.observe_llm):
+        assert llm.keywords["temperature"] == hn.LLM_TEMPERATURE
+        assert llm.keywords["max_tokens"] == hn.LLM_MAX_TOKENS
+    assert config.build_reason_context is hn._build_reason_context
+    assert config.build_score_payload is hn._build_score_payload
     assert config.on_step is None
 
 
 def test_live_progress_disabled_by_default() -> None:
-    assert hn_agent._live_progress_enabled() is False
+    assert hn._live_progress_enabled() is False
 
 
 def test_debug_log_level_alone_does_not_enable_live_progress(monkeypatch) -> None:
@@ -71,26 +73,26 @@ def test_debug_log_level_alone_does_not_enable_live_progress(monkeypatch) -> Non
     already prints its own per-node detail via `logging`, so tying the live
     printer to DEBUG too would triple the output for the same events."""
     monkeypatch.setenv("PULSE_LOG_LEVEL", "DEBUG")
-    assert hn_agent._live_progress_enabled() is False
+    assert hn._live_progress_enabled() is False
 
 
 def test_live_progress_enabled_by_verbose_flag(monkeypatch) -> None:
     monkeypatch.setenv("PULSE_VERBOSE", "1")
-    assert hn_agent._live_progress_enabled() is True
+    assert hn._live_progress_enabled() is True
 
 
 def test_config_wires_on_step_printer_when_live_progress_enabled(monkeypatch) -> None:
     monkeypatch.setenv("PULSE_VERBOSE", "1")
 
-    config = hn_agent._config()
+    config = hn._config()
 
-    assert config.on_step is hn_agent._print_step
+    assert config.on_step is hn._print_step
 
 
 def test_print_step_writes_to_stderr(capsys) -> None:
     event = TraceEvent(kind=TraceKind.REASON, message="thinking")
 
-    hn_agent._print_step(event)
+    hn._print_step(event)
 
     captured = capsys.readouterr()
     assert captured.out == ""
@@ -100,7 +102,7 @@ def test_print_step_writes_to_stderr(capsys) -> None:
 def test_print_step_surfaces_query_when_not_already_in_message(capsys) -> None:
     event = TraceEvent(kind=TraceKind.REASON, message="thinking", query="AI LLM refined")
 
-    hn_agent._print_step(event)
+    hn._print_step(event)
 
     assert "query='AI LLM refined'" in capsys.readouterr().err
 
@@ -112,28 +114,55 @@ def test_print_step_does_not_duplicate_query_already_in_message(capsys) -> None:
         query="AI LLM refined",
     )
 
-    hn_agent._print_step(event)
+    hn._print_step(event)
 
     assert capsys.readouterr().err.count("AI LLM refined") == 1
 
 
-def test_search_fn_calls_tavily_with_hacker_news_source(monkeypatch) -> None:
+def test_reason_prompt_encodes_intent_contract() -> None:
+    prompt = hn.REASON_SYSTEM_PROMPT
+
+    assert "must_keep_terms" in prompt
+    assert "site:" in prompt
+    assert "no default topic" in prompt
+    # The prompt must stay topic-agnostic (no product-domain or example topics
+    # baked in) and free of implementation details the model doesn't need.
+    for term in ("LangGraph", "OpenAI", "RAG", "Claude", "nginx", "crypto", "ReAct"):
+        assert term not in prompt
+
+
+def test_observe_prompt_has_no_baked_in_topics_or_implementation_details() -> None:
+    prompt = hn.OBSERVE_SYSTEM_PROMPT
+
+    for term in ("AI", "LLM", "nginx", "crypto", "ReAct"):
+        assert term not in prompt
+
+
+def test_observe_prompt_scores_against_original_query() -> None:
+    prompt = hn.OBSERVE_SYSTEM_PROMPT
+
+    assert "original_query" in prompt
+    assert "generated_query" in prompt
+    assert "drift" in prompt.lower()
+
+
+def test_search_fn_calls_tavily_with_hn_source_and_domain(monkeypatch) -> None:
     calls = []
 
-    def _fake_search_articles(query, source, *, max_results=10):
-        calls.append((query, source, max_results))
+    def _fake_search_articles(query, source, *, max_results=10, include_domains=None):
+        calls.append((query, source, max_results, include_domains))
         return [ARTICLE]
 
-    monkeypatch.setattr(hn_agent, "search_articles", _fake_search_articles)
+    monkeypatch.setattr(hn, "search_articles", _fake_search_articles)
 
-    articles = hn_agent._search("AI LLM", 5)
+    articles = hn._search("AI LLM", 5)
 
     assert articles == [ARTICLE]
-    assert calls == [("AI LLM", Source.HACKER_NEWS, 5)]
+    assert calls == [("AI LLM", Source.HACKER_NEWS, 5, hn.HN_DOMAINS)]
 
 
 def test_build_score_payload_maps_item_fields() -> None:
-    payload = hn_agent._build_score_payload([ARTICLE])
+    payload = hn._build_score_payload([ARTICLE])
 
     assert payload == [
         {
@@ -145,12 +174,14 @@ def test_build_score_payload_maps_item_fields() -> None:
     ]
 
 
-def _base_state(**overrides) -> hn_agent.ReActState:
-    state: hn_agent.ReActState = {
+def _base_state(**overrides) -> hn.ReActState:
+    state: hn.ReActState = {
+        "original_query": "AI LLM",
         "query": "AI LLM",
         "max_results": 10,
         "iteration": 0,
         "items": [],
+        "best_items": [],
         "best_score": 0.0,
         "last_score": 0.0,
         "done": False,
@@ -162,19 +193,41 @@ def _base_state(**overrides) -> hn_agent.ReActState:
 
 
 def test_reason_context_on_first_iteration_has_no_feedback() -> None:
-    context = hn_agent._build_reason_context(_base_state(), hn_agent._config())
+    context = hn._build_reason_context(_base_state(), hn._config())
 
-    assert context == "Current query: AI LLM"
+    assert context == "Original user query (the contract): AI LLM"
+
+
+def test_reason_context_always_carries_original_query() -> None:
+    """Regression for intent drift: even after the reason step rewrites the
+    query, the next reason call must still see the user's original query so
+    it cannot re-anchor on its own previous rewrite."""
+    state = _base_state(
+        original_query="Kubernetes ingress nginx tuning site:news.ycombinator.com",
+        query="LLM deployment Kubernetes site:news.ycombinator.com",
+        iteration=1,
+        last_score=0.3,
+        items=[ARTICLE],
+    )
+
+    context = hn._build_reason_context(state, hn._config())
+
+    assert (
+        "Original user query (the contract): "
+        "Kubernetes ingress nginx tuning site:news.ycombinator.com"
+    ) in context
+    assert "Last generated query: LLM deployment Kubernetes site:news.ycombinator.com" in context
+    assert "do not switch subjects" in context
 
 
 def test_reason_context_includes_score_remaining_and_titles() -> None:
     state = _base_state(iteration=1, last_score=0.42, items=[ARTICLE])
 
-    context = hn_agent._build_reason_context(state, hn_agent._config())
+    context = hn._build_reason_context(state, hn._config())
 
-    assert f"attempt 1 of {hn_agent.MAX_ITERATIONS}" in context
+    assert f"attempt 1 of {hn.MAX_ITERATIONS}" in context
     assert "0.42" in context
-    assert f"{hn_agent.MAX_ITERATIONS - 1} attempt" in context
+    assert f"{hn.MAX_ITERATIONS - 1} attempt" in context
     assert ARTICLE.title in context
 
 
@@ -184,10 +237,10 @@ def test_reason_context_reflects_config_max_iterations_not_module_constant() -> 
     different max_iterations would silently diverge from the engine's actual
     stop condition."""
     state = _base_state(iteration=1, last_score=0.5)
-    config = hn_agent._config()
+    config = hn._config()
     config.max_iterations = 10
 
-    context = hn_agent._build_reason_context(state, config)
+    context = hn._build_reason_context(state, config)
 
     assert "attempt 1 of 10" in context
     assert "9 attempt" in context
@@ -202,52 +255,52 @@ def test_reason_context_caps_title_preview() -> None:
             summary="s",
             source=Source.HACKER_NEWS,
         )
-        for i in range(hn_agent.PREVIEW_TITLE_COUNT + 3)
+        for i in range(hn.PREVIEW_TITLE_COUNT + 3)
     ]
     state = _base_state(iteration=1, last_score=0.5, items=articles)
 
-    context = hn_agent._build_reason_context(state, hn_agent._config())
+    context = hn._build_reason_context(state, hn._config())
 
     assert "Article 0" in context
-    assert f"Article {hn_agent.PREVIEW_TITLE_COUNT}" not in context
+    assert f"Article {hn.PREVIEW_TITLE_COUNT}" not in context
 
 
 def test_run_hn_react_end_to_end_with_hn_wiring(monkeypatch) -> None:
-    def _fake_search_articles(query, source, *, max_results=10):
+    def _fake_search_articles(query, source, *, max_results=10, include_domains=None):
         return [ARTICLE]
 
-    def _fake_complete(messages, models, response_model):
+    def _fake_complete(messages, models, response_model, **kwargs):
         if response_model is ReasonDecision:
             return ReasonDecision(thought="look for AI news", query="AI LLM refined")
         if response_model is SourceBatchScore:
             return SourceBatchScore(relevance=0.9, novelty=0.9, quality=0.9)
         raise AssertionError(f"unexpected response_model: {response_model}")
 
-    monkeypatch.setattr(hn_agent, "search_articles", _fake_search_articles)
-    monkeypatch.setattr(hn_agent, "complete_structured", _fake_complete)
+    monkeypatch.setattr(hn, "search_articles", _fake_search_articles)
+    monkeypatch.setattr(hn, "complete_structured", _fake_complete)
 
-    result = hn_agent.run_hn_react(query="AI LLM")
+    result = hn.run_hn_react(query="AI LLM")
 
     assert result.stop_reason == StopReason.SCORE_THRESHOLD
     assert result.items == [ARTICLE]
     act_event = next(e for e in result.trace if e.kind == TraceKind.ACT)
-    assert act_event.message.startswith(f'{hn_agent.ACTION_NAME}("AI LLM refined")')
+    assert act_event.message.startswith(f'{hn.ACTION_NAME}("AI LLM refined")')
 
 
 def test_fetch_hn_articles_returns_articles_from_run_hn_react(monkeypatch) -> None:
-    def _fake_search_articles(query, source, *, max_results=10):
+    def _fake_search_articles(query, source, *, max_results=10, include_domains=None):
         return [ARTICLE]
 
-    def _fake_complete(messages, models, response_model):
+    def _fake_complete(messages, models, response_model, **kwargs):
         if response_model is ReasonDecision:
             return ReasonDecision(thought="t", query="q")
         if response_model is SourceBatchScore:
             return SourceBatchScore(relevance=0.9, novelty=0.9, quality=0.9)
         raise AssertionError(f"unexpected response_model: {response_model}")
 
-    monkeypatch.setattr(hn_agent, "search_articles", _fake_search_articles)
-    monkeypatch.setattr(hn_agent, "complete_structured", _fake_complete)
+    monkeypatch.setattr(hn, "search_articles", _fake_search_articles)
+    monkeypatch.setattr(hn, "complete_structured", _fake_complete)
 
-    articles = hn_agent.fetch_hn_articles(query="AI LLM")
+    articles = hn.fetch_hn_articles(query="AI LLM")
 
     assert articles == [ARTICLE]

@@ -38,6 +38,7 @@ def search_articles(
     source: Source,
     *,
     max_results: int = 10,
+    include_domains: list[str] | None = None,
 ) -> SourceItemList:
     load_dotenv()
 
@@ -52,6 +53,7 @@ def search_articles(
         max_results=max_results,
         search_depth="basic",
         include_answer=False,
+        include_domains=include_domains,
     )
     raw_results = response.get("results", [])
     logger.debug("Tavily search query=%r returned %d raw results", query, len(raw_results))

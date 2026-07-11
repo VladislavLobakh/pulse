@@ -10,15 +10,19 @@ PULSE — personal AI intelligence & content factory: collects AI news from mult
 
 ```
 src/pulse/
-  models.py       — shared domain types (Article, Source, ArticleList, enums)
+  models.py       — shared domain types only (Source, SourceItem)
+  patterns/       — agentic pattern engines + their LLM contracts (react.py)
   collectors/     — one file per data source; own the fetch + parse logic
-  agents/         — thin orchestration wrappers; import from collectors + models, no fetch logic
+  agents/         — per-source business configs (hn.py); pick a pattern, no fetch logic
+  evals/          — live-model regression evals, one module per tested property
   display.py      — terminal/CLI output only
   scripts/        — runnable utilities (e.g. generate_test_data)
 tests/            — mirrors src/pulse/ structure
 ```
 
-New shared types → `models.py`. New data source → `collectors/<name>.py`.
+New shared domain types → `models.py`. New data source → `collectors/<name>.py` +
+`agents/<name>.py`. New agentic pattern → `patterns/<name>.py` (engine together
+with its Pydantic LLM contracts).
 
 ## Setup
 
@@ -31,7 +35,7 @@ uv sync                          # install from lockfile
 ```bash
 uv run pytest                    # run tests
 uv run ruff check --fix && uv run ruff format   # lint + format
-uv run python -m pulse.main      # run the app
+uv run python -m pulse.main "<search query>"   # run the app (query is required)
 ```
 
 Run everything with `uv run`; never activate the venv manually.
@@ -44,6 +48,7 @@ Run everything with `uv run`; never activate the venv manually.
 - Every agent graph → `recursion_limit=10` via runtime `config=` (not `compile()`).
 - Qdrant: always `upsert`, never `delete`+`recreate`.
 - Agents never fetch directly — fetch/parse logic lives in `collectors/`.
+- **Comments:** write a comment only for a non-obvious constraint or "why" the code itself cannot express, and keep it to 1–2 lines. Never narrate what the next line does, restate names/types, describe the change just made, or duplicate what an ADR/docstring already records. Fewer comments is the default.
 
 ## Forbidden actions
 

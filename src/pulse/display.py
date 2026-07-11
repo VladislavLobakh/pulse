@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import sys
 
-from pulse.agents.react_loop import _step_suffix
-from pulse.models import SourceItemList, TraceEvent
+from pulse.models import SourceItemList
+from pulse.patterns.react import TraceEvent, step_suffix
 
 
 def print_trace(trace: list[TraceEvent]) -> None:
     print("\n=== Reason / Act / Observe trace ===\n")
     for event in trace:
-        print(f"{event.kind.capitalize()}: {event.message}{_step_suffix(event)}")
+        print(f"{event.kind.capitalize()}: {event.message}{step_suffix(event)}")
     print()
 
 

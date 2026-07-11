@@ -7,7 +7,7 @@ PULSE — personal AI intelligence & content factory: collects AI news from mult
 ## Current capabilities
 
 - HN source agent collects AI articles from Hacker News via Tavily
-- CLI entry points: `uv run python -m pulse.agents.hn_agent` or `uv run python -m pulse.main`
+- CLI entry point: `uv run python -m pulse.main "<search query>"`
 - Digest, LangGraph orchestration, Qdrant — planned (see `docs/architecture.md`)
 
 ## Setup
@@ -21,9 +21,7 @@ cp .env.example .env
 # fill in TAVILY_API_KEY (required)
 
 # 3. Collect HN articles
-uv run python -m pulse.agents.hn_agent
-# or
-uv run python -m pulse.main
+uv run python -m pulse.main "postgres vacuum tuning"
 ```
 
 ## Development
@@ -45,8 +43,10 @@ pulse/
 │   └── skills/            # Claude skill bridges (load on invocation)
 ├── docs/                  # project documentation
 ├── src/pulse/             # source code
+│   ├── patterns/          # agentic pattern engines (react, …)
 │   ├── collectors/        # fetch + parse per source
-│   └── agents/            # orchestration (hn_agent, …)
+│   ├── agents/            # per-source configs (hn, …)
+│   └── evals/             # live-model regression evals
 ├── tests/                 # pytest
 ├── data/                  # test fixtures
 └── pyproject.toml         # Python deps (installed packages)
