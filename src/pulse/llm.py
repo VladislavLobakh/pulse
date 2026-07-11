@@ -1,8 +1,9 @@
 """OpenRouter LLM gateway — structured completions via litellm + Instructor.
 
 Shared gateway only: retry/fallback/fail-fast error handling and the actual
-Instructor call. Callers always pass an explicit model list — no model slug
-is hardcoded here. Each source agent decides its own model chain per ReAct
+Instructor call. Callers always pass an explicit model list and sampling
+params (temperature/max_tokens) — no model slug or sampling policy is
+hardcoded here. Each source agent decides its own model chain per ReAct
 step (e.g. reason vs observe) as plain code constants, since model slugs
 aren't secrets; only the API key is a secret, so only that comes from env.
 
@@ -87,9 +88,8 @@ TRANSIENT_ERRORS = (
 )
 
 # Current model unusable — skip retry, fall back to the next configured model.
-# ValidationError belongs here (not fail-fast): once Instructor's reask is
-# exhausted it means "this model can't produce valid JSON for this schema" — a
-# per-model defect, which is exactly what the fallback chain exists for.
+# ValidationError: an exhausted Instructor reask means this model can't produce
+# valid JSON for the schema — a per-model defect, so fall back, don't fail.
 FALLBACK_ERRORS = (
     litellm.NotFoundError,
     litellm.BadGatewayError,
@@ -115,12 +115,9 @@ def get_api_key() -> str:
 
 
 def _unwrap(exc: Exception) -> Exception:
-    # Instructor's own retry loop catches *any* exception raised by the raw API
-    # call (see instructor/v2/core/retry.py) and wraps it in
-    # InstructorRetryException(...) from <original> before it ever reaches us —
-    # so without this unwrap, TRANSIENT_ERRORS/FALLBACK_ERRORS/FAIL_FAST_ERRORS
-    # above never match a real litellm error. `__cause__` holds the original
-    # exception Instructor chained. Non-Instructor exceptions pass through.
+    # Instructor wraps any error from the raw API call in
+    # InstructorRetryException — without unwrapping `__cause__`, the error
+    # tables above would never match a real litellm error.
     if isinstance(exc, InstructorRetryException) and isinstance(exc.__cause__, Exception):
         return exc.__cause__
     return exc
@@ -210,6 +207,8 @@ def _call_model[T: BaseModel](
     messages: list[dict],
     response_model: type[T],
     api_key: str,
+    temperature: float,
+    max_tokens: int,
 ) -> T:
     started = time.monotonic()
     try:
@@ -219,12 +218,10 @@ def _call_model[T: BaseModel](
             response_model=response_model,
             api_key=api_key,
             timeout=_REQUEST_TIMEOUT_SECONDS,
-            # Instructor's internal retry loop (client default 3) re-asks the
-            # model only on validation/parse errors — API errors pass through
-            # to the tenacity retry wrapping this function. max_retries counts
-            # retries *after* the initial attempt, so 1 = up to two attempts:
-            # one shot plus one reask, enough for a model to self-correct
-            # malformed JSON without multiplying across the model chain.
+            temperature=temperature,
+            max_tokens=max_tokens,
+            # One Instructor reask on invalid JSON only — API errors pass
+            # through to the tenacity retry wrapping this function.
             max_retries=1,
         )
     except (InstructorRetryException, litellm.APIError) as exc:
@@ -237,19 +234,19 @@ def _call_model[T: BaseModel](
 
 
 def complete_structured[T: BaseModel](
-    messages: list[dict], models: list[str], response_model: type[T]
+    messages: list[dict],
+    models: list[str],
+    response_model: type[T],
+    *,
+    temperature: float,
+    max_tokens: int,
 ) -> T:
     api_key = get_api_key()
-    # litellm defaults to a 6000s request_timeout; the explicit `timeout=` kwarg
-    # on create_with_completion should already cap each call, but this global
-    # sets the same cap at the litellm layer in case a code path doesn't
-    # forward the per-call kwarg (e.g. it silently doesn't apply the timeout
-    # library-side depending on transport). Belt and suspenders, same value.
+    # Same cap at the litellm layer in case a call path drops the per-call
+    # timeout kwarg (litellm's own default is 6000s).
     litellm.request_timeout = _REQUEST_TIMEOUT_SECONDS
-    # Mode.TOOLS (function-calling) is instructor's default but some OpenRouter
-    # models/providers handle tool-call schemas poorly or hang instead of
-    # erroring — Mode.JSON asks for plain JSON output instead, which is widely
-    # supported and avoids that failure mode.
+    # Mode.JSON over instructor's default Mode.TOOLS: some OpenRouter
+    # models/providers hang or mishandle tool-call schemas.
     client = instructor.from_litellm(litellm.completion, mode=instructor.Mode.JSON)
 
     last_error: Exception | None = None
@@ -262,7 +259,9 @@ def complete_structured[T: BaseModel](
                 _summarize_messages(messages),
             )
         try:
-            result = _call_model(client, model, messages, response_model, api_key)
+            result = _call_model(
+                client, model, messages, response_model, api_key, temperature, max_tokens
+            )
         except FAIL_FAST_ERRORS as exc:
             logger.warning("LLM call model=%s failed fast (%s), no retry/fallback", model, exc)
             raise

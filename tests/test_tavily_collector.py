@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from pulse.collectors.tavily import parse_tavily_results
+import pulse.collectors.tavily as tavily_module
+from pulse.collectors.tavily import parse_tavily_results, search_articles
 from pulse.models import Source, SourceItem
 
 MOCK_RAW_RESULTS = [
@@ -106,3 +107,36 @@ def test_parse_tavily_results_handles_missing_published_date() -> None:
 
 def test_parse_tavily_results_empty_input() -> None:
     assert parse_tavily_results([], Source.HACKER_NEWS) == []
+
+
+class _FakeTavilyClient:
+    last_kwargs: dict = {}
+
+    def __init__(self, api_key: str) -> None:
+        pass
+
+    def search(self, **kwargs):
+        _FakeTavilyClient.last_kwargs = kwargs
+        return {"results": []}
+
+
+def _search_with_fake_client(monkeypatch, **kwargs) -> dict:
+    monkeypatch.setattr(tavily_module, "load_dotenv", lambda *a, **k: None)
+    monkeypatch.setenv("TAVILY_API_KEY", "tvly-test")
+    monkeypatch.setattr(tavily_module, "TavilyClient", _FakeTavilyClient)
+    search_articles("some query", Source.HACKER_NEWS, max_results=5, **kwargs)
+    return _FakeTavilyClient.last_kwargs
+
+
+def test_search_articles_passes_caller_domains_through(monkeypatch) -> None:
+    """The collector is a generic search client — domain restriction is the
+    caller's knowledge, passed in, never a mapping owned by this module."""
+    kwargs = _search_with_fake_client(monkeypatch, include_domains=["news.ycombinator.com"])
+
+    assert kwargs["include_domains"] == ["news.ycombinator.com"]
+
+
+def test_search_articles_defaults_to_unrestricted_domains(monkeypatch) -> None:
+    kwargs = _search_with_fake_client(monkeypatch)
+
+    assert kwargs["include_domains"] is None

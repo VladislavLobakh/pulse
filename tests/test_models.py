@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-import pytest
-from pydantic import ValidationError
-
-from pulse.models import ReasonDecision, Source, SourceBatchScore, SourceItem
+from pulse.models import Source, SourceItem
 
 
 def test_source_item_construction_with_all_fields() -> None:
@@ -52,24 +49,3 @@ def test_source_enum_lists_all_sources() -> None:
         "newsletter",
         "twitter",
     }
-
-
-def test_reason_decision_validates() -> None:
-    decision = ReasonDecision(thought="look for AI news", query="AI LLM site:news.ycombinator.com")
-    assert decision.thought == "look for AI news"
-    assert decision.query == "AI LLM site:news.ycombinator.com"
-
-
-def test_source_batch_score_validates() -> None:
-    score = SourceBatchScore(relevance=0.5, novelty=0.6, quality=0.7)
-    assert score.overall == pytest.approx(0.6)
-
-
-def test_source_batch_score_rejects_out_of_range_relevance() -> None:
-    with pytest.raises(ValidationError):
-        SourceBatchScore(relevance=1.5, novelty=0.5, quality=0.5)
-
-
-def test_source_batch_score_rejects_negative_score() -> None:
-    with pytest.raises(ValidationError):
-        SourceBatchScore(relevance=0.5, novelty=-0.1, quality=0.5)

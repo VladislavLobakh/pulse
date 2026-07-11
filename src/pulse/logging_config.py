@@ -27,11 +27,8 @@ def _configure() -> None:
         return
     _configured = True
 
-    # get_logger() runs at import time in every module that logs (react_loop,
-    # llm, tavily), before any of them would otherwise call load_dotenv() —
-    # without this, PULSE_LOG_LEVEL/PULSE_VERBOSE set only in .env (not
-    # exported in the shell) would be invisible here and to any later
-    # os.getenv("PULSE_VERBOSE") read (e.g. hn_agent's live-progress check).
+    # Runs at import time, before any module calls load_dotenv() itself —
+    # without this, PULSE_LOG_LEVEL/PULSE_VERBOSE set only in .env are invisible.
     load_dotenv()
 
     level = logging.getLevelName(os.getenv("PULSE_LOG_LEVEL", "INFO").upper())

@@ -75,9 +75,7 @@ This table **must** match the containers in `workspace.dsl`.
 **HN collect** — [`architecture/flows/hn-collect.mmd`](architecture/flows/hn-collect.mmd)
 
 ```bash
-uv run python -m pulse.agents.hn_agent
-# or
-uv run python -m pulse.main
+uv run python -m pulse.main "<search query>"
 ```
 
 Preview locally:

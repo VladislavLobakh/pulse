@@ -1,42 +1,28 @@
-"""Generic ReAct loop (reason -> act -> observe) — reusable across source agents.
+"""ReAct pattern (reason -> act -> observe) — engine and its LLM contracts.
 
-This module owns only the technical implementation: graph shape, iteration
-counting, stop-on-threshold / stop-on-max-iterations mechanics, and trace
-accumulation. It knows nothing about Hacker News, Tavily, OpenRouter, or any
-other concrete source/gateway — every source-specific concern (how to
-search, how to call an LLM, how to phrase reasoning context, how to format a
-batch for scoring, how to label an action in the trace) is injected via
-`ReActConfig`. A source agent (e.g. `hn_agent.py`) supplies that config; this
-module never imports anything source- or gateway-specific.
+Owns only the pattern mechanics: graph shape, iteration counting, stop/retry,
+trace accumulation, and the Pydantic contracts its LLM steps must return.
+Every source-specific concern (search, LLM calls, prompt wording, payload
+shape, action label) is injected via `ReActConfig`; this module never imports
+anything source- or gateway-specific.
 
-Debug visibility: every node logs enter/exit via stdlib `logging` (module
-name `pulse.agents.react_loop`, controlled by `PULSE_LOG_LEVEL`), and each
-trace event is also handed to `config.on_step` if set, for a source agent to
-wire up immediate progress output (e.g. printing to stderr) as the run
-happens, not only once `run_react()` returns the final trace.
+Nodes log enter/exit via stdlib `logging` (`PULSE_LOG_LEVEL`), and each trace
+event is also handed to `config.on_step` as it happens, for live progress.
 """
 
 from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TypedDict
 
 from langgraph.graph import END, StateGraph
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from pulse.logging_config import get_logger
-from pulse.models import (
-    ReActResult,
-    ReasonDecision,
-    SourceBatchScore,
-    SourceItemList,
-    StopReason,
-    TraceEvent,
-    TraceKind,
-)
+from pulse.models import SourceItemList
 
 logger = get_logger(__name__)
 
@@ -44,6 +30,92 @@ DEFAULT_ACTION_NAME = "search"
 DEFAULT_SCORE_THRESHOLD = 0.75
 DEFAULT_MAX_ITERATIONS = 3
 DEFAULT_RECURSION_LIMIT = 10
+
+
+# --- LLM output contracts (Pydantic — Instructor requires Pydantic) ---
+
+
+class ReasonDecision(BaseModel):
+    must_keep_terms: list[str] = Field(
+        default_factory=list,
+        description="Terms from the ORIGINAL user query that every generated "
+        "query must preserve: named technologies, products, acronyms, quoted "
+        "phrases, negative terms (-term), and operators (site:...). Empty "
+        "only when the original query names no concrete terms at all.",
+    )
+    thought: str = Field(
+        description="Brief reasoning for why this query is the best next "
+        "search, given the original user query and any feedback on previous "
+        "attempts."
+    )
+    query: str = Field(
+        description="The next search query to run. Must contain every entry "
+        "of `must_keep_terms` (close spelling variants allowed) and stay on "
+        "the topic of the original user query."
+    )
+
+
+class SourceBatchScore(BaseModel):
+    relevance: float = Field(
+        ge=0,
+        le=1,
+        description="How closely the batch matches the ORIGINAL user query "
+        "(0 = off-topic or drifted to a different subject, 1 = squarely on "
+        "the topic the user asked for).",
+    )
+    novelty: float = Field(
+        ge=0,
+        le=1,
+        description="How much new information the batch adds beyond content "
+        "already known or previously seen (0 = stale/repeat, 1 = fresh).",
+    )
+    quality: float = Field(
+        ge=0,
+        le=1,
+        description="Editorial/technical quality of the items themselves "
+        "(0 = low-effort or spam, 1 = well-sourced and substantive).",
+    )
+
+    @property
+    def overall(self) -> float:
+        return (self.relevance + self.novelty + self.quality) / 3
+
+
+# --- Run result + trace (returned to callers, not LLM outputs) ---
+
+
+class StopReason(StrEnum):
+    SCORE_THRESHOLD = "score_threshold"
+    MAX_ITERATIONS = "max_iterations"
+    NO_RESULTS = "no_results"
+    ERROR = "error"
+
+
+class TraceKind(StrEnum):
+    REASON = "reason"
+    ACT = "act"
+    OBSERVE = "observe"
+
+
+@dataclass
+class TraceEvent:
+    kind: TraceKind
+    message: str
+    query: str | None = None
+    result_count: int | None = None
+    score: float | None = None
+
+
+@dataclass
+class ReActResult:
+    items: SourceItemList
+    stop_reason: StopReason
+    trace: list[TraceEvent] = field(default_factory=list)
+    best_score: float = 0.0
+    iterations: int = 0
+
+
+# --- Engine ---
 
 
 class NodeName(StrEnum):
@@ -54,10 +126,12 @@ class NodeName(StrEnum):
 
 
 class ReActState(TypedDict):
-    query: str
+    original_query: str  # the user's query verbatim — the intent contract, never rewritten
+    query: str  # the query the next act step will run — rewritten by reason each iteration
     max_results: int
     iteration: int
-    items: SourceItemList
+    items: SourceItemList  # batch from the most recent act (overwritten every iteration)
+    best_items: SourceItemList  # batch that earned best_score — what the run returns
     best_score: float  # running max score seen across all iterations
     last_score: float  # score from the most recent observe (used for reasoning)
     done: bool
@@ -68,22 +142,16 @@ class ReActState(TypedDict):
 # (query, max_results) -> results. Each source agent binds this to its own collector.
 SearchFn = Callable[[str, int], SourceItemList]
 
-# Mirrors pulse.llm.complete_structured's signature (models already bound by the
-# source agent) so the loop calls it generically, without importing any LLM gateway
-# or knowing which model chain backs a given step.
+# Mirrors pulse.llm.complete_structured with the model chain already bound, so
+# the loop never imports an LLM gateway.
 StructuredLLMFn = Callable[..., BaseModel]
 
 # Formats the current item batch into whatever representation the scoring
 # LLM call should see (e.g. title/url/summary for HN, authors/abstract for ArXiv).
 ScorePayloadBuilder = Callable[[SourceItemList], object]
 
-# Builds the user-message content for the reason step — wording, feedback shape,
-# and how much of the previous batch to surface are all source-specific business
-# logic. Takes `config` too (not just `state`) so builders read the *live*
-# score_threshold/max_iterations off the same config the engine runs with,
-# instead of baking in their own constants that could drift from it.
-# "ReActConfig" is a string forward-ref: it's defined below, but Callable[...]
-# never resolves its args at runtime, so the forward reference is never an issue.
+# Builds the reason step's user message (source-specific wording). Takes
+# `config` so builders read live thresholds instead of baking in constants.
 ReasonContextBuilder = Callable[["ReActState", "ReActConfig"], str]
 
 # Called with each TraceEvent as it happens (not just once at the end of the
@@ -114,7 +182,7 @@ class ReActConfig:
     on_step: OnStepCallback | None = None
 
 
-def _step_suffix(event: TraceEvent) -> str:
+def step_suffix(event: TraceEvent) -> str:
     # Only surface the query separately when the message doesn't already embed
     # it (the act event's message already reads `action("query") -> N results`).
     if event.query and event.query not in event.message:
@@ -123,24 +191,25 @@ def _step_suffix(event: TraceEvent) -> str:
 
 
 def _emit(config: ReActConfig, state: ReActState, event: TraceEvent) -> list[TraceEvent]:
-    logger.info("%s: %s%s", event.kind.capitalize(), event.message, _step_suffix(event))
+    logger.info("%s: %s%s", event.kind.capitalize(), event.message, step_suffix(event))
     if config.on_step is not None:
         config.on_step(event)
     return [*state["trace"], event]
 
 
+def build_reason_messages(state: ReActState, config: ReActConfig) -> list[dict]:
+    return [
+        {"role": "system", "content": config.reason_system_prompt},
+        {"role": "user", "content": config.build_reason_context(state, config)},
+    ]
+
+
 def _make_reason_node(config: ReActConfig) -> Callable[[ReActState], dict]:
     def _reason_node(state: ReActState) -> dict:
         logger.debug("Entering node=%s iteration=%d", NodeName.REASON, state["iteration"])
-        context = config.build_reason_context(state, config)
-        logger.debug("Reason context: %s", context)
-        decision = config.reason_llm(
-            messages=[
-                {"role": "system", "content": config.reason_system_prompt},
-                {"role": "user", "content": context},
-            ],
-            response_model=ReasonDecision,
-        )
+        messages = build_reason_messages(state, config)
+        logger.debug("Reason context: %s", messages[-1]["content"])
+        decision = config.reason_llm(messages=messages, response_model=ReasonDecision)
         logger.debug("ReasonDecision query=%r thought=%r", decision.query, decision.thought[:200])
         event = TraceEvent(kind=TraceKind.REASON, message=decision.thought, query=decision.query)
         result = {"query": decision.query, "trace": _emit(config, state, event)}
@@ -189,15 +258,28 @@ def _make_no_results_node(config: ReActConfig) -> Callable[[ReActState], dict]:
     return _no_results_node
 
 
+def build_scoring_input(state: ReActState, config: ReActConfig) -> dict:
+    """Both queries go to the scorer so drift is judged against user intent,
+    not the reason step's own rewrite."""
+    return {
+        "original_query": state["original_query"],
+        "generated_query": state["query"],
+        "results": config.build_score_payload(state["items"]),
+    }
+
+
+def build_observe_messages(state: ReActState, config: ReActConfig) -> list[dict]:
+    return [
+        {"role": "system", "content": config.observe_system_prompt},
+        {"role": "user", "content": json.dumps(build_scoring_input(state, config))},
+    ]
+
+
 def _make_observe_node(config: ReActConfig) -> Callable[[ReActState], dict]:
     def _observe_node(state: ReActState) -> dict:
         logger.debug("Entering node=%s iteration=%d", NodeName.OBSERVE, state["iteration"])
-        payload = config.build_score_payload(state["items"])
         result = config.observe_llm(
-            messages=[
-                {"role": "system", "content": config.observe_system_prompt},
-                {"role": "user", "content": json.dumps(payload)},
-            ],
+            messages=build_observe_messages(state, config),
             response_model=SourceBatchScore,
         )
         logger.debug(
@@ -208,7 +290,12 @@ def _make_observe_node(config: ReActConfig) -> Callable[[ReActState], dict]:
             result.overall,
         )
         iteration = state["iteration"] + 1
-        best_score = max(state["best_score"], result.overall)
+        # Updated as a pair so the returned batch and its reported score can
+        # never describe different attempts.
+        if result.overall > state["best_score"]:
+            best_score, best_items = result.overall, state["items"]
+        else:
+            best_score, best_items = state["best_score"], state["best_items"]
         done = False
         stop_reason: StopReason | None = None
         if result.overall >= config.score_threshold:
@@ -224,6 +311,7 @@ def _make_observe_node(config: ReActConfig) -> Callable[[ReActState], dict]:
 
         out = {
             "best_score": best_score,
+            "best_items": best_items,
             "last_score": result.overall,
             "iteration": iteration,
             "done": done,
@@ -264,20 +352,26 @@ def build_graph(config: ReActConfig):
     return graph.compile()
 
 
-def run_react(config: ReActConfig, query: str, max_results: int) -> ReActResult:
-    logger.info("Starting ReAct run query=%r max_results=%d", query, max_results)
-    graph = build_graph(config)
-    initial_state: ReActState = {
+def make_initial_state(query: str, max_results: int) -> ReActState:
+    return {
+        "original_query": query,
         "query": query,
         "max_results": max_results,
         "iteration": 0,
         "items": [],
+        "best_items": [],
         "best_score": 0.0,
         "last_score": 0.0,
         "done": False,
         "stop_reason": None,
         "trace": [],
     }
+
+
+def run_react(config: ReActConfig, query: str, max_results: int) -> ReActResult:
+    logger.info("Starting ReAct run query=%r max_results=%d", query, max_results)
+    graph = build_graph(config)
+    initial_state = make_initial_state(query, max_results)
     final_state = graph.invoke(initial_state, config={"recursion_limit": config.recursion_limit})
 
     # The graph only reaches END via observe_node or no_results_node, both of which
@@ -290,7 +384,7 @@ def run_react(config: ReActConfig, query: str, max_results: int) -> ReActResult:
         final_state["best_score"],
     )
     return ReActResult(
-        final_state["items"],
+        final_state["best_items"],
         stop_reason,
         trace=final_state["trace"],
         best_score=final_state["best_score"],
