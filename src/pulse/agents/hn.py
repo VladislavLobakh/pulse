@@ -19,10 +19,12 @@ import sys
 from pulse.collectors.tavily import search_articles
 from pulse.llm import complete_structured
 from pulse.models import Source, SourceItemList
+from pulse.patterns.parallel import RunStatus, SourceOutput, SourceRunner
 from pulse.patterns.react import (
     ReActConfig,
     ReActResult,
     ReActState,
+    StopReason,
     TraceEvent,
     run_react,
     step_suffix,
@@ -178,3 +180,24 @@ def run_hn_react(query: str, max_results: int = MAX_RESULTS) -> ReActResult:
 
 def fetch_hn_articles(query: str, max_results: int = MAX_RESULTS) -> SourceItemList:
     return run_hn_react(query=query, max_results=max_results).items
+
+
+def _run_for_parallel(query: str, max_results: int) -> SourceOutput:
+    result = run_hn_react(query=query, max_results=max_results)
+    # min() so a run capped below MIN_ARTICLES is not automatically partial.
+    min_expected = min(MIN_ARTICLES, max_results)
+    if result.stop_reason is StopReason.SCORE_THRESHOLD and len(result.items) >= min_expected:
+        return SourceOutput(items=result.items, status=RunStatus.SUCCESS)
+    reason = (
+        "below_min_articles"
+        if result.stop_reason is StopReason.SCORE_THRESHOLD
+        else result.stop_reason.value
+    )
+    return SourceOutput(items=result.items, status=RunStatus.PARTIAL, error=reason)
+
+
+def hn_runner(max_results: int = MAX_RESULTS) -> SourceRunner:
+    return SourceRunner(
+        source=Source.HACKER_NEWS,
+        run=functools.partial(_run_for_parallel, max_results=max_results),
+    )

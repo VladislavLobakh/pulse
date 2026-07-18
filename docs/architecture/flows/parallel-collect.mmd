@@ -1,0 +1,29 @@
+---
+title: "Parallel source collect flow (current / Implemented)"
+---
+sequenceDiagram
+    participant Caller as Caller (integration layer)
+    participant Par as patterns.parallel run_sources (coordinator)
+    participant Run as Configured source runners × N (worker threads)
+    participant HN as agents.hn hn_runner (first wired runner)
+    participant React as patterns.react (ReAct engine)
+
+    Caller->>Par: run_sources(query, [SourceRunner, ...])
+    Par->>Par: empty runners -> ValueError (configuration error)
+
+    par asyncio.gather — one asyncio.to_thread task per runner
+        Par->>Run: asyncio.to_thread(runner.run, query)
+        Run->>HN: _run_for_parallel(query, max_results)
+        HN->>React: run_hn_react(query, max_results)
+        React-->>HN: ReActResult(items, stop_reason)
+        HN-->>Run: SourceOutput(items, status, error code) from stop_reason + min(MIN_ARTICLES, max_results)
+        alt runner raises
+            Run-->>Par: FAILED SourceRunResult (error = exception class name; safe log, no message)
+        else runner returns SourceOutput
+            Run-->>Par: SourceRunResult keeps runner status/error, adds source + elapsed_ms
+        end
+    end
+
+    Par->>Par: combine non-FAILED items, dedup normalized URLs (first in runner order wins)
+    Par->>Par: aggregate status: all success / all failed / else partial
+    Par-->>Caller: ParallelRunResult(results, items, status, elapsed_ms)

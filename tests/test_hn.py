@@ -9,12 +9,16 @@ thresholds) and wires it into the engine correctly.
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 import pulse.agents.hn as hn
 import pulse.llm as llm_module
 from pulse.models import Source, SourceItem
+from pulse.patterns.parallel import RunStatus, run_sources
 from pulse.patterns.react import (
+    ReActResult,
     ReasonDecision,
     SourceBatchScore,
     StopReason,
@@ -304,3 +308,99 @@ def test_fetch_hn_articles_returns_articles_from_run_hn_react(monkeypatch) -> No
     articles = hn.fetch_hn_articles(query="AI LLM")
 
     assert articles == [ARTICLE]
+
+
+def test_hn_runner_runs_through_parallel_contract(monkeypatch) -> None:
+    def _fake_search_articles(query, source, *, max_results=10, include_domains=None):
+        return [ARTICLE]
+
+    def _fake_complete(messages, models, response_model, **kwargs):
+        if response_model is ReasonDecision:
+            return ReasonDecision(thought="t", query="q")
+        if response_model is SourceBatchScore:
+            return SourceBatchScore(relevance=0.9, novelty=0.9, quality=0.9)
+        raise AssertionError(f"unexpected response_model: {response_model}")
+
+    monkeypatch.setattr(hn, "search_articles", _fake_search_articles)
+    monkeypatch.setattr(hn, "complete_structured", _fake_complete)
+
+    result = asyncio.run(run_sources("AI LLM", [hn.hn_runner(max_results=1)]))
+
+    assert result.status is RunStatus.SUCCESS
+    source_result = result.results[0]
+    assert source_result.source is Source.HACKER_NEWS
+    assert source_result.status is RunStatus.SUCCESS
+    assert source_result.elapsed_ms >= 0
+    assert result.items == [ARTICLE]
+
+
+def test_hn_runner_passes_query_and_max_results_behaviorally(monkeypatch) -> None:
+    captured = {}
+
+    def _fake_run_hn_react(query, max_results):
+        captured["query"] = query
+        captured["max_results"] = max_results
+        return ReActResult(items=[ARTICLE], stop_reason=StopReason.SCORE_THRESHOLD)
+
+    monkeypatch.setattr(hn, "run_hn_react", _fake_run_hn_react)
+
+    output = hn.hn_runner(max_results=3).run("agentic RAG")
+
+    assert captured == {"query": "agentic RAG", "max_results": 3}
+    assert output.items == [ARTICLE]
+
+
+def _fake_react(stop_reason: StopReason, items: list[SourceItem]):
+    return lambda query, max_results: ReActResult(items=items, stop_reason=stop_reason)
+
+
+def test_hn_runner_maps_score_threshold_with_enough_items_to_success(monkeypatch) -> None:
+    items = [ARTICLE] * hn.MIN_ARTICLES
+    monkeypatch.setattr(hn, "run_hn_react", _fake_react(StopReason.SCORE_THRESHOLD, items))
+
+    output = hn.hn_runner().run("q")
+
+    assert output.status is RunStatus.SUCCESS
+    assert output.error is None
+    assert output.items == items
+
+
+def test_hn_runner_maps_score_threshold_with_too_few_items_to_partial(monkeypatch) -> None:
+    monkeypatch.setattr(hn, "run_hn_react", _fake_react(StopReason.SCORE_THRESHOLD, [ARTICLE]))
+
+    output = hn.hn_runner().run("q")
+
+    assert output.status is RunStatus.PARTIAL
+    assert output.error == "below_min_articles"
+    assert output.items == [ARTICLE]
+
+
+def test_hn_runner_maps_max_iterations_to_partial_even_with_enough_items(monkeypatch) -> None:
+    items = [ARTICLE] * hn.MIN_ARTICLES
+    monkeypatch.setattr(hn, "run_hn_react", _fake_react(StopReason.MAX_ITERATIONS, items))
+
+    output = hn.hn_runner().run("q")
+
+    assert output.status is RunStatus.PARTIAL
+    assert output.error == "max_iterations"
+    assert output.items == items
+
+
+def test_hn_runner_maps_no_results_to_partial(monkeypatch) -> None:
+    monkeypatch.setattr(hn, "run_hn_react", _fake_react(StopReason.NO_RESULTS, []))
+
+    output = hn.hn_runner().run("q")
+
+    assert output.status is RunStatus.PARTIAL
+    assert output.error == "no_results"
+    assert output.items == []
+
+
+def test_hn_runner_small_max_results_run_can_still_succeed(monkeypatch) -> None:
+    items = [ARTICLE] * 3
+    monkeypatch.setattr(hn, "run_hn_react", _fake_react(StopReason.SCORE_THRESHOLD, items))
+
+    output = hn.hn_runner(max_results=3).run("q")
+
+    assert output.status is RunStatus.SUCCESS
+    assert output.error is None
