@@ -5,18 +5,39 @@ sequenceDiagram
     participant Caller as Caller (integration layer)
     participant Par as patterns.parallel run_sources (coordinator)
     participant Run as Configured source runners × N (worker threads)
-    participant HN as agents.hn hn_runner (first wired runner)
+    participant HN as agents.hn hn_runner
     participant React as patterns.react (ReAct engine)
+    participant AX as agents.arxiv arxiv_runner
+    participant AXCol as collectors.arxiv
+    participant AXAPI as ArXiv Atom API
+    participant Extract as Tavily Extract
 
     Caller->>Par: run_sources(query, [SourceRunner, ...])
     Par->>Par: empty runners -> ValueError (configuration error)
 
     par asyncio.gather — one asyncio.to_thread task per runner
         Par->>Run: asyncio.to_thread(runner.run, query)
-        Run->>HN: _run_for_parallel(query, max_results)
-        HN->>React: run_hn_react(query, max_results)
-        React-->>HN: ReActResult(items, stop_reason)
-        HN-->>Run: SourceOutput(items, status, error code) from stop_reason + min(MIN_ARTICLES, max_results)
+        alt configured runner is Hacker News
+            Run->>HN: _run_for_parallel(query, max_results)
+            HN->>React: run_hn_react(query, max_results)
+            React-->>HN: ReActResult(items, stop_reason)
+            HN-->>Run: SourceOutput from stop_reason + min(MIN_ARTICLES, max_results)
+        else configured runner is ArXiv
+            Run->>AX: _run_for_parallel(original_query, limits)
+            AX->>AXCol: search_arxiv_papers(original_query, limits)
+            AXCol->>AXCol: deterministically build fielded ArXiv query
+            AXCol->>AXCol: serialize; wait ≥3 s from previous request start
+            AXCol->>AXAPI: one bounded GET (30 s timeout)
+            AXAPI-->>AXCol: Atom feed
+            AXCol->>AXCol: reject error feed; skip malformed papers; normalize SourceItems
+            opt first 0–2 papers with PDF links
+                AXCol->>Extract: one query-focused batch (20 s timeout)
+                Extract-->>AXCol: raw_content per successful URL
+                AXCol->>AXCol: append bounded highlights; failures keep abstracts
+            end
+            AXCol-->>AX: SourceItemList
+            AX-->>Run: SUCCESS or PARTIAL(no_results)
+        end
         alt runner raises
             Run-->>Par: FAILED SourceRunResult (error = exception class name; safe log, no message)
         else runner returns SourceOutput

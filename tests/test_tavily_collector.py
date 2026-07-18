@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
 import pulse.collectors.tavily as tavily_module
-from pulse.collectors.tavily import parse_tavily_results, search_articles
+from pulse.collectors.tavily import extract_content, parse_tavily_results, search_articles
 from pulse.models import Source, SourceItem
 
 MOCK_RAW_RESULTS = [
@@ -111,6 +113,7 @@ def test_parse_tavily_results_empty_input() -> None:
 
 class _FakeTavilyClient:
     last_kwargs: dict = {}
+    extract_response: dict = {"results": []}
 
     def __init__(self, api_key: str) -> None:
         pass
@@ -118,6 +121,10 @@ class _FakeTavilyClient:
     def search(self, **kwargs):
         _FakeTavilyClient.last_kwargs = kwargs
         return {"results": []}
+
+    def extract(self, **kwargs):
+        _FakeTavilyClient.last_kwargs = kwargs
+        return _FakeTavilyClient.extract_response
 
 
 def _search_with_fake_client(monkeypatch, **kwargs) -> dict:
@@ -140,3 +147,68 @@ def test_search_articles_defaults_to_unrestricted_domains(monkeypatch) -> None:
     kwargs = _search_with_fake_client(monkeypatch)
 
     assert kwargs["include_domains"] is None
+
+
+def _extract_with_fake_client(monkeypatch, response: dict) -> tuple[dict, dict[str, str]]:
+    monkeypatch.setattr(tavily_module, "load_dotenv", lambda *a, **k: None)
+    monkeypatch.setenv("TAVILY_API_KEY", "tvly-test")
+    monkeypatch.setattr(tavily_module, "TavilyClient", _FakeTavilyClient)
+    _FakeTavilyClient.extract_response = response
+    extracted = extract_content(
+        ["https://arxiv.org/pdf/2502.00001"],
+        query='agentic "tool use"',
+    )
+    return _FakeTavilyClient.last_kwargs, extracted
+
+
+def test_extract_content_uses_explicit_bounded_options_and_raw_content(monkeypatch) -> None:
+    kwargs, extracted = _extract_with_fake_client(
+        monkeypatch,
+        {
+            "results": [
+                {
+                    "url": "https://arxiv.org/pdf/2502.00001",
+                    "raw_content": "PDF text",
+                    "content": "must not be used",
+                }
+            ]
+        },
+    )
+
+    assert kwargs == {
+        "urls": ["https://arxiv.org/pdf/2502.00001"],
+        "query": 'agentic "tool use"',
+        "chunks_per_source": 3,
+        "format": "text",
+        "extract_depth": "advanced",
+        "timeout": tavily_module.EXTRACT_TIMEOUT_SECONDS,
+    }
+    assert extracted == {"https://arxiv.org/pdf/2502.00001": "PDF text"}
+
+
+def test_extract_content_ignores_failed_and_malformed_results(monkeypatch) -> None:
+    _, extracted = _extract_with_fake_client(
+        monkeypatch,
+        {
+            "results": [
+                {"url": "https://arxiv.org/pdf/1", "content": "wrong field"},
+                {"url": "https://arxiv.org/pdf/2", "raw_content": None},
+                {"raw_content": "missing url"},
+                "not a mapping",
+            ],
+            "failed_results": [{"url": "https://arxiv.org/pdf/3", "error": "failed"}],
+        },
+    )
+
+    assert extracted == {}
+
+
+def test_extract_content_empty_urls_needs_no_credentials(monkeypatch) -> None:
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    monkeypatch.setattr(
+        tavily_module,
+        "TavilyClient",
+        lambda *args, **kwargs: pytest.fail("client must not be created"),
+    )
+
+    assert extract_content([], query="agentic") == {}
