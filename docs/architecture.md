@@ -54,7 +54,7 @@ Tavily, OpenRouter, ArXiv, YouTube, RSS Newsletters, Twitter/X, Telegram, Linked
 
 | Container | Tech | Local / Deploy | Status |
 |---|---|---|---|
-| Agent Runtime (collectors + agents + orchestrator) | Python / LangGraph | `uv run` (CLI) | **Implemented** (HN ReAct loop only) |
+| Agent Runtime (collectors + agents + orchestrator) | Python / LangGraph | `uv run` (CLI) | **Implemented** (HN ReAct loop + parallel fan-out; multi-source integration Planned) |
 | FastAPI Core | Modal `@asgi_app` | `https://pulse--api.modal.run` | Planned |
 | FastMCP Server | Modal `@web_endpoint` | `https://pulse--mcp.modal.run` | Planned |
 | Digest Scheduler | Modal `@cron` 08:00 | daily 08:00 UTC | Planned |
@@ -83,6 +83,9 @@ Preview locally:
 ```bash
 npx @mermaid-js/mermaid-cli -i docs/architecture/flows/hn-collect.mmd -o /tmp/hn-collect.svg
 ```
+
+**Parallel source collect** — [`architecture/flows/parallel-collect.mmd`](architecture/flows/parallel-collect.mmd) —
+library-level fan-out (`patterns/parallel.py`), not yet wired into the CLI.
 
 ### Target (Planned)
 
