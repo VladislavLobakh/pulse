@@ -11,7 +11,7 @@ sequenceDiagram
     Caller->>Par: run_sources(query, [SourceRunner, ...])
     Par->>Par: empty runners -> ValueError (configuration error)
 
-    par asyncio.gather — one worker thread per runner
+    par asyncio.gather — one asyncio.to_thread task per runner
         Par->>Run: asyncio.to_thread(runner.run, query)
         Run->>HN: _run_for_parallel(query, max_results)
         HN->>React: run_hn_react(query, max_results)

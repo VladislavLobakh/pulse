@@ -81,7 +81,7 @@ dataclass contracts (run results, not LLM outputs, so no Pydantic):
 
 ## Related
 
-- Architecture: [docs/architecture.md](../architecture.md)
-- Flow: [flows/parallel-collect.mmd](flows/parallel-collect.mmd)
+- Architecture: [../../architecture.md](../../architecture.md)
+- Flow: [../flows/parallel-collect.mmd](../flows/parallel-collect.mmd)
 - ADR 6: generic ReAct loop engine separate from source agents
 - ADR 9: package-by-pattern module structure
