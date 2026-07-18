@@ -7,6 +7,8 @@ PULSE — personal AI intelligence & content factory: collects AI news from mult
 ## Current capabilities
 
 - HN source agent collects AI articles from Hacker News via Tavily
+- ArXiv source runner returns normalized research papers through the shared source contract
+  (library use; not wired into the CLI)
 - CLI entry point: `uv run python -m pulse.main "<search query>"`
 - Digest, LangGraph orchestration, Qdrant — planned (see `docs/architecture.md`)
 
@@ -18,7 +20,7 @@ uv sync
 
 # 2. Configure environment
 cp .env.example .env
-# fill in TAVILY_API_KEY (required)
+# fill in TAVILY_API_KEY (required for HN; optional for ArXiv PDF enrichment)
 
 # 3. Collect HN articles
 uv run python -m pulse.main "postgres vacuum tuning"
