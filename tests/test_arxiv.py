@@ -11,7 +11,7 @@ import pytest
 import pulse.agents.arxiv as arxiv_agent
 from pulse.collectors.arxiv import ArxivAPIError
 from pulse.models import Source, SourceItem
-from pulse.patterns.parallel import RunStatus, run_sources
+from pulse.patterns.parallel import RunStatus, SourceOutput, SourceRunner, run_sources
 
 PAPER = SourceItem(
     title="Agentic Retrieval Systems",
@@ -20,6 +20,14 @@ PAPER = SourceItem(
     summary="An abstract.",
     source=Source.ARXIV,
     published_date="2025-02-03",
+)
+
+HN_ITEM = SourceItem(
+    title="Agentic retrieval discussion",
+    url="https://news.ycombinator.com/item?id=12345",
+    score=0.8,
+    summary="A Hacker News discussion.",
+    source=Source.HACKER_NEWS,
 )
 
 
@@ -94,11 +102,24 @@ def test_runner_works_through_source_neutral_coordinator(monkeypatch) -> None:
         lambda *args, **kwargs: [PAPER],
     )
 
-    result = asyncio.run(run_sources("agentic", [arxiv_agent.arxiv_runner(max_results=1)]))
+    other_runner = SourceRunner(
+        source=Source.HACKER_NEWS,
+        run=lambda query: SourceOutput(items=[HN_ITEM], status=RunStatus.SUCCESS),
+    )
+    result = asyncio.run(
+        run_sources(
+            "agentic",
+            [arxiv_agent.arxiv_runner(max_results=1), other_runner],
+        )
+    )
 
     assert result.status is RunStatus.SUCCESS
-    assert result.items == [PAPER]
-    assert result.results[0].source is Source.ARXIV
+    assert result.items == [PAPER, HN_ITEM]
+    assert [source_result.source for source_result in result.results] == [
+        Source.ARXIV,
+        Source.HACKER_NEWS,
+    ]
+    assert all(source_result.status is RunStatus.SUCCESS for source_result in result.results)
 
 
 def _http_error() -> httpx.HTTPStatusError:

@@ -9,6 +9,7 @@ import httpx
 import pytest
 
 import pulse.collectors.arxiv as arxiv
+import pulse.collectors.tavily as tavily
 from pulse.models import Source
 
 _DEFAULT_URL = object()
@@ -478,6 +479,26 @@ def test_global_enrichment_failure_keeps_every_abstract(monkeypatch) -> None:
     items = arxiv.search_arxiv_papers("agentic", pdf_enrichment_limit=2)
 
     assert items[0].summary == "An abstract about agentic retrieval."
+
+
+def test_missing_tavily_credentials_keep_original_abstract(monkeypatch) -> None:
+    original_abstract = "Credential-independent abstract."
+    monkeypatch.setattr(
+        arxiv.httpx,
+        "get",
+        lambda *args, **kwargs: _Response(_feed(_entry("2502.00001", summary=original_abstract))),
+    )
+    monkeypatch.setattr(tavily, "load_dotenv", lambda: None)
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    monkeypatch.setattr(
+        tavily,
+        "TavilyClient",
+        lambda *args, **kwargs: pytest.fail("Tavily client must not be created"),
+    )
+
+    items = arxiv.search_arxiv_papers("agentic", pdf_enrichment_limit=1)
+
+    assert items[0].summary == original_abstract
 
 
 @pytest.mark.parametrize("pdf_enrichment_limit", [1.5, True, "2"])
