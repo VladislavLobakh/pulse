@@ -6,6 +6,7 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
+from html import unescape
 from urllib.parse import urlsplit, urlunsplit
 
 import feedparser
@@ -83,7 +84,7 @@ def relevance_score(query: str, text: str) -> float:
 
 
 def _clean_text(raw: str) -> str:
-    return " ".join(_HTML_TAG_RE.sub(" ", raw).split())
+    return " ".join(_HTML_TAG_RE.sub(" ", unescape(raw)).split())
 
 
 def _entry_text(entry: feedparser.FeedParserDict) -> str:
@@ -207,7 +208,7 @@ def fetch_newsletter_items(
     if feeds and len(failed) == len(feeds):
         raise NewsletterFeedError("all newsletter feeds failed")
 
-    relevant = [item for item in _dedup(collected) if item.score > 0.0]
+    relevant = _dedup([item for item in collected if item.score > 0.0])
     # Stable sort: equal scores keep (feed-config, entry) order, so output is deterministic.
     relevant.sort(key=lambda item: -item.score)
     return NewsletterFetchResult(items=relevant[:max_results], failed_feeds=tuple(failed))

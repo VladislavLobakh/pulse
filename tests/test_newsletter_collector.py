@@ -173,6 +173,21 @@ def test_entry_without_content_falls_back_to_description(monkeypatch) -> None:
     assert result.items[0].summary == "[Latent Space] Only the description mentions llamas."
 
 
+def test_html_entities_are_unescaped_before_summary_and_scoring(monkeypatch) -> None:
+    responses = {
+        LATENT.url: _rss_feed(_rss_item(content="<p>yesterday&#8217;s agent update</p>")),
+        WILLISON.url: _atom_feed(),
+    }
+    _mock_feeds(monkeypatch, responses)
+
+    result = newsletter.fetch_newsletter_items("yesterday")
+    numeric_entity_result = newsletter.fetch_newsletter_items("8217")
+
+    assert result.items[0].summary == "[Latent Space] yesterday’s agent update"
+    assert result.items[0].score == 1.0
+    assert numeric_entity_result.items == []
+
+
 def test_missing_title_or_link_skips_entry_but_keeps_siblings(monkeypatch) -> None:
     _mock_feeds(
         monkeypatch,
@@ -375,6 +390,32 @@ def test_duplicate_canonical_urls_keep_first_feed_item(monkeypatch) -> None:
 
     assert [item.title for item in result.items] == ["Latent agentic copy"]
     assert result.items[0].summary.startswith("[Latent Space]")
+
+
+def test_irrelevant_duplicate_does_not_hide_later_relevant_item(monkeypatch) -> None:
+    _mock_feeds(
+        monkeypatch,
+        {
+            LATENT.url: _rss_feed(
+                _rss_item(
+                    title="Irrelevant copy",
+                    link="https://example.com/post/",
+                    content="unrelated",
+                )
+            ),
+            WILLISON.url: _atom_feed(
+                _atom_entry(
+                    title="Relevant agentic copy",
+                    link="https://example.com/post#atom-everything",
+                )
+            ),
+        },
+    )
+
+    result = newsletter.fetch_newsletter_items("agentic")
+
+    assert [item.title for item in result.items] == ["Relevant agentic copy"]
+    assert result.items[0].summary.startswith("[Simon Willison]")
 
 
 @pytest.mark.parametrize(
