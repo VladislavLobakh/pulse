@@ -10,11 +10,9 @@ imported into the Structurizr decision log.
 
 ## Current vs target
 
-**Implemented today:** Agent Runtime (HN ReAct loop over Tavily plus source-neutral parallel
-fan-out with HN, ArXiv and YouTube runners), Tavily, OpenRouter, ArXiv and YouTube external
-integrations. ArXiv uses its Atom API for metadata and optional bounded Tavily extraction for
-PDF highlights. YouTube discovers videos via Tavily restricted to `youtube.com` and turns
-available transcripts into bounded excerpts via `youtube-transcript-api`.
+**Implemented today:** Agent Runtime with HN ReAct collection and source-neutral parallel
+runners for HN, ArXiv, YouTube and Newsletter. External integrations: Tavily, OpenRouter,
+ArXiv, YouTube and RSS newsletters.
 
 **Target (Planned):** remaining containers and flows in `Container_Target` view — see table below.
 
@@ -57,7 +55,7 @@ Tavily, OpenRouter, ArXiv, YouTube, RSS Newsletters, Twitter/X, Telegram, Linked
 
 | Container | Tech | Local / Deploy | Status |
 |---|---|---|---|
-| Agent Runtime (collectors + agents + orchestrator) | Python / LangGraph | `uv run` (CLI) | **Implemented** (HN ReAct + HN/ArXiv/YouTube runners + parallel fan-out; CLI remains HN-only) |
+| Agent Runtime (collectors + agents + orchestrator) | Python / LangGraph | `uv run` (CLI) | **Implemented** (HN CLI + four-source library fan-out) |
 | FastAPI Core | Modal `@asgi_app` | `https://pulse--api.modal.run` | Planned |
 | FastMCP Server | Modal `@web_endpoint` | `https://pulse--mcp.modal.run` | Planned |
 | Digest Scheduler | Modal `@cron` 08:00 | daily 08:00 UTC | Planned |
@@ -88,7 +86,7 @@ npx @mermaid-js/mermaid-cli -i docs/architecture/flows/hn-collect.mmd -o /tmp/hn
 ```
 
 **Parallel source collect** — [`architecture/flows/parallel-collect.mmd`](architecture/flows/parallel-collect.mmd) —
-library-level fan-out (`patterns/parallel.py`) with HN, ArXiv and YouTube runners, not wired into the CLI.
+library-level multi-source fan-out; the CLI remains HN-only.
 
 ### Target (Planned)
 

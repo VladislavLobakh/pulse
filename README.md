@@ -6,9 +6,9 @@ PULSE — personal AI intelligence & content factory: collects AI news from mult
 
 ## Current capabilities
 
-- HN source agent collects AI articles from Hacker News via Tavily
-- ArXiv source runner returns normalized research papers through the shared source contract
-  (library use; not wired into the CLI)
+- Source runners for HN (via Tavily), ArXiv papers, YouTube transcripts, and configured
+  newsletter RSS/Atom feeds
+- Source-neutral parallel coordinator for library use; the CLI currently runs HN only
 - CLI entry point: `uv run python -m pulse.main "<search query>"`
 - Digest, LangGraph orchestration, Qdrant — planned (see `docs/architecture.md`)
 
@@ -70,6 +70,6 @@ pulse/
 
 ## Stack
 
-**Installed** (in `pyproject.toml`): uv · Ruff · pytest · tavily-python · httpx · python-dotenv · faker
+**Installed** (in `pyproject.toml`): uv · Ruff · pytest · tavily-python · httpx · feedparser · youtube-transcript-api · python-dotenv · faker
 
 **Planned** (see `docs/architecture.md`): LangGraph · LangChain · FastMCP · Qdrant · Mem0 · Langfuse · Modal · Inngest · LightRAG + Neo4j · PostgreSQL · Redis · Next.js dashboard

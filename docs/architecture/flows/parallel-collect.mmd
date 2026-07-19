@@ -15,6 +15,9 @@ sequenceDiagram
     participant YTCol as collectors.youtube
     participant TavS as Tavily Search
     participant YTAPI as YouTube transcript endpoint
+    participant NL as agents.newsletter newsletter_runner
+    participant NLCol as collectors.newsletter
+    participant Feeds as Newsletter RSS/Atom feeds
 
     Caller->>Par: run_sources(query, [SourceRunner, ...])
     Par->>Par: empty runners -> ValueError (configuration error)
@@ -58,6 +61,18 @@ sequenceDiagram
             Note over YTCol: request blocks, unparsable data and unknown errors propagate
             YTCol-->>YT: YouTubeCollectResult(items, skipped)
             YT-->>Run: SUCCESS or PARTIAL(skipped_videos | no_transcripts | no_results)
+        else configured runner is Newsletter
+            Run->>NL: _run_for_parallel(query, max_results)
+            NL->>NLCol: fetch_newsletter_items(query, max_results)
+            loop each configured feed (Latent Space, Simon Willison)
+                NLCol->>Feeds: one bounded GET (10 s timeout)
+                Feeds-->>NLCol: RSS/Atom bytes
+                NLCol->>NLCol: feed failure -> warn + continue; skip malformed entries
+            end
+            NLCol->>NLCol: deterministic keyword scoring; drop zero scores; dedup canonical URLs
+            Note over NLCol: every feed failing raises NewsletterFeedError
+            NLCol-->>NL: NewsletterFetchResult(items, failed_feeds)
+            NL-->>Run: SUCCESS or PARTIAL(no_results | partial_feed_failure)
         end
         alt runner raises
             Run-->>Par: FAILED SourceRunResult (error = exception class name; safe log, no message)
