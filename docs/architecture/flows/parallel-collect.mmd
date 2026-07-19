@@ -11,6 +11,10 @@ sequenceDiagram
     participant AXCol as collectors.arxiv
     participant AXAPI as ArXiv Atom API
     participant Extract as Tavily Extract
+    participant YT as agents.youtube youtube_runner
+    participant YTCol as collectors.youtube
+    participant TavS as Tavily Search
+    participant YTAPI as YouTube transcript endpoint
 
     Caller->>Par: run_sources(query, [SourceRunner, ...])
     Par->>Par: empty runners -> ValueError (configuration error)
@@ -37,6 +41,23 @@ sequenceDiagram
             end
             AXCol-->>AX: SourceItemList
             AX-->>Run: SUCCESS or PARTIAL(no_results)
+        else configured runner is YouTube
+            Run->>YT: _run_for_parallel(query, limits)
+            YT->>YTCol: search_youtube_videos(query, limits)
+            YTCol->>TavS: search restricted to youtube.com
+            TavS-->>YTCol: discovered video URLs
+            YTCol->>YTCol: normalize URL variants to canonical video ids; dedup
+            loop first ≤ MAX_TRANSCRIPTS candidates (one shared session, finite timeout)
+                YTCol->>YTAPI: fetch transcript
+                alt captions disabled / missing / restricted
+                    YTCol->>YTCol: record skip (video id + exception class name only)
+                else transcript available
+                    YTCol->>YTCol: bounded whitespace-normalized excerpt -> SourceItem
+                end
+            end
+            Note over YTCol: request blocks, unparsable data and unknown errors propagate
+            YTCol-->>YT: YouTubeCollectResult(items, skipped)
+            YT-->>Run: SUCCESS or PARTIAL(skipped_videos | no_transcripts | no_results)
         end
         alt runner raises
             Run-->>Par: FAILED SourceRunResult (error = exception class name; safe log, no message)
