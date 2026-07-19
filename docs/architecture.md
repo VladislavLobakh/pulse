@@ -11,8 +11,10 @@ imported into the Structurizr decision log.
 ## Current vs target
 
 **Implemented today:** Agent Runtime (HN ReAct loop over Tavily plus source-neutral parallel
-fan-out with HN and ArXiv runners), Tavily, OpenRouter, and ArXiv external integrations. ArXiv
-uses its Atom API for metadata and optional bounded Tavily extraction for PDF highlights.
+fan-out with HN, ArXiv and YouTube runners), Tavily, OpenRouter, ArXiv and YouTube external
+integrations. ArXiv uses its Atom API for metadata and optional bounded Tavily extraction for
+PDF highlights. YouTube discovers videos via Tavily restricted to `youtube.com` and turns
+available transcripts into bounded excerpts via `youtube-transcript-api`.
 
 **Target (Planned):** remaining containers and flows in `Container_Target` view — see table below.
 
@@ -55,7 +57,7 @@ Tavily, OpenRouter, ArXiv, YouTube, RSS Newsletters, Twitter/X, Telegram, Linked
 
 | Container | Tech | Local / Deploy | Status |
 |---|---|---|---|
-| Agent Runtime (collectors + agents + orchestrator) | Python / LangGraph | `uv run` (CLI) | **Implemented** (HN ReAct + HN/ArXiv runners + parallel fan-out; CLI remains HN-only) |
+| Agent Runtime (collectors + agents + orchestrator) | Python / LangGraph | `uv run` (CLI) | **Implemented** (HN ReAct + HN/ArXiv/YouTube runners + parallel fan-out; CLI remains HN-only) |
 | FastAPI Core | Modal `@asgi_app` | `https://pulse--api.modal.run` | Planned |
 | FastMCP Server | Modal `@web_endpoint` | `https://pulse--mcp.modal.run` | Planned |
 | Digest Scheduler | Modal `@cron` 08:00 | daily 08:00 UTC | Planned |
@@ -86,7 +88,7 @@ npx @mermaid-js/mermaid-cli -i docs/architecture/flows/hn-collect.mmd -o /tmp/hn
 ```
 
 **Parallel source collect** — [`architecture/flows/parallel-collect.mmd`](architecture/flows/parallel-collect.mmd) —
-library-level fan-out (`patterns/parallel.py`) with HN and ArXiv runners, not wired into the CLI.
+library-level fan-out (`patterns/parallel.py`) with HN, ArXiv and YouTube runners, not wired into the CLI.
 
 ### Target (Planned)
 
