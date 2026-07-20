@@ -2,7 +2,8 @@
 title: "Parallel source collect flow (current / Implemented)"
 ---
 sequenceDiagram
-    participant Caller as Caller (integration layer)
+    actor User
+    participant CLI as CLI (pulse.main)
     participant Par as patterns.parallel run_sources (coordinator)
     participant Run as Configured source runners × N (worker threads)
     participant HN as agents.hn hn_runner
@@ -18,8 +19,10 @@ sequenceDiagram
     participant NL as agents.newsletter newsletter_runner
     participant NLCol as collectors.newsletter
     participant Feeds as Newsletter RSS/Atom feeds
+    participant Disp as display
 
-    Caller->>Par: run_sources(query, [SourceRunner, ...])
+    User->>CLI: uv run python -m pulse.main "query"
+    CLI->>Par: run_sources(query, build_runners())
     Par->>Par: empty runners -> ValueError (configuration error)
 
     par asyncio.gather — one asyncio.to_thread task per runner
@@ -83,4 +86,11 @@ sequenceDiagram
 
     Par->>Par: combine non-FAILED items, dedup normalized URLs (first in runner order wins)
     Par->>Par: aggregate status: all success / all failed / else partial
-    Par-->>Caller: ParallelRunResult(results, items, status, elapsed_ms)
+    Par-->>CLI: ParallelRunResult(results, items, status, elapsed_ms)
+    CLI->>Disp: print_run_summary(result) (per-source status/count/elapsed + aggregate line)
+    alt aggregate status is FAILED
+        CLI-->>User: source summary only, exit code 1, no item listing
+    else aggregate status is SUCCESS or PARTIAL
+        CLI->>Disp: print_items(result.items)
+        Disp-->>User: source summary + N combined items (title, url, score, summary)
+    end

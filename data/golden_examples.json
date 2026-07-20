@@ -1,0 +1,42 @@
+[
+  {
+    "id": "arxiv-1706.03762",
+    "source": "arxiv",
+    "item_id": "1706.03762",
+    "url": "https://arxiv.org/abs/1706.03762",
+    "title": "Attention Is All You Need",
+    "expected_summary": "Introduces the Transformer architecture, which replaces recurrence and convolutions with self-attention alone. It became the architectural foundation of modern large language models.",
+    "quality": 5,
+    "reviewer_note": "Foundational paper; a canonical result for queries about Transformer architecture and self-attention."
+  },
+  {
+    "id": "arxiv-2210.03629",
+    "source": "arxiv",
+    "item_id": "2210.03629",
+    "url": "https://arxiv.org/abs/2210.03629",
+    "title": "ReAct: Synergizing Reasoning and Acting in Language Models",
+    "expected_summary": "Proposes interleaving chain-of-thought reasoning with external tool actions, letting a language model plan, act, and observe results in a loop.",
+    "quality": 5,
+    "reviewer_note": "Foundational paper for the ReAct pattern used by the Hacker News source workflow."
+  },
+  {
+    "id": "youtube-zjkBMFhNj_g",
+    "source": "youtube",
+    "item_id": "zjkBMFhNj_g",
+    "url": "https://www.youtube.com/watch?v=zjkBMFhNj_g",
+    "title": "[1hr Talk] Intro to Large Language Models",
+    "expected_summary": "Andrej Karpathy's one-hour survey of how LLMs are trained, how they work, and the emerging security and capability landscape around them.",
+    "quality": 5,
+    "reviewer_note": "Widely cited primer and a strong introduction to large language models."
+  },
+  {
+    "id": "newsletter-llms-in-2024",
+    "source": "newsletter",
+    "item_id": "llms-in-2024",
+    "url": "https://simonwillison.net/2024/Dec/31/llms-in-2024/",
+    "title": "Things we learned about LLMs in 2024",
+    "expected_summary": "A year-in-review of LLM capability, cost, and multimodal trends across 2024, written as a long-form retrospective.",
+    "quality": 5,
+    "reviewer_note": "Well-regarded yearly retrospective with broad, accurate coverage of the LLM landscape."
+  }
+]

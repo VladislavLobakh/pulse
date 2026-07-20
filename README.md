@@ -8,7 +8,8 @@ PULSE — personal AI intelligence & content factory: collects AI news from mult
 
 - Source runners for HN (via Tavily), ArXiv papers, YouTube transcripts, and configured
   newsletter RSS/Atom feeds
-- Source-neutral parallel coordinator for library use; the CLI currently runs HN only
+- Source-neutral parallel coordinator; the CLI fans out to all four sources concurrently
+  with a per-source status summary
 - CLI entry point: `uv run python -m pulse.main "<search query>"`
 - Digest, LangGraph orchestration, Qdrant — planned (see `docs/architecture.md`)
 
@@ -20,9 +21,10 @@ uv sync
 
 # 2. Configure environment
 cp .env.example .env
-# fill in TAVILY_API_KEY (required for HN; optional for ArXiv PDF enrichment)
+# fill in TAVILY_API_KEY (HN + YouTube discovery) and OPENROUTER_API_KEY
+# (HN reasoning); ArXiv and Newsletter need no keys.
 
-# 3. Collect HN articles
+# 3. Collect items from all sources
 uv run python -m pulse.main "postgres vacuum tuning"
 ```
 
@@ -50,7 +52,7 @@ pulse/
 │   ├── agents/            # per-source configs (hn, …)
 │   └── evals/             # live-model regression evals
 ├── tests/                 # pytest
-├── data/                  # test fixtures
+├── data/                  # test fixtures + golden eval examples
 └── pyproject.toml         # Python deps (installed packages)
 ```
 
