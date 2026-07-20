@@ -1,13 +1,17 @@
 """Deterministic tests for the parallel fan-out engine.
 
-No sleeps or network: concurrency is proven with threading primitives whose
-timeouts are failure guards, not pacing.
+Concurrency is mostly proven with threading primitives whose timeouts are
+failure guards, not pacing. Two timing tests below use real sleeps by
+necessity — they assert relative comparisons (slowest vs. sum, parallel vs.
+measured sequential), never absolute wall-clock thresholds, so they stay
+robust to scheduler jitter.
 """
 
 from __future__ import annotations
 
 import asyncio
 import threading
+import time
 
 import pytest
 
@@ -246,3 +250,50 @@ def test_normalize_url_malformed_input_falls_back_without_raising() -> None:
     item = _item("http://[bad")
     result = _run([_runner(Source.HACKER_NEWS, lambda query: _ok([item]))])
     assert result.items == [item]
+
+
+def test_aggregate_elapsed_tracks_slowest_runner_not_the_sum() -> None:
+    sleep_seconds = 0.2
+    barrier = threading.Barrier(3)
+
+    def run(query: str) -> SourceOutput:
+        # All three must be in flight together before any sleeps, so the
+        # sleeps provably overlap instead of racing to start first.
+        barrier.wait(timeout=WAIT_TIMEOUT)
+        time.sleep(sleep_seconds)
+        return _ok([])
+
+    result = _run(
+        [
+            _runner(Source.HACKER_NEWS, run),
+            _runner(Source.ARXIV, run),
+            _runner(Source.YOUTUBE, run),
+        ]
+    )
+
+    per_source = [r.elapsed_ms for r in result.results]
+    assert result.elapsed_ms >= max(per_source)
+    assert result.elapsed_ms < sum(per_source)
+
+
+def test_parallel_execution_is_faster_than_sequential_for_same_runners() -> None:
+    sleep_seconds = 0.15
+
+    def run(query: str) -> SourceOutput:
+        time.sleep(sleep_seconds)
+        return _ok([])
+
+    runners = [
+        _runner(Source.HACKER_NEWS, run),
+        _runner(Source.ARXIV, run),
+        _runner(Source.YOUTUBE, run),
+    ]
+
+    sequential_start = time.perf_counter()
+    for runner in runners:
+        runner.run("query")
+    sequential_elapsed_ms = (time.perf_counter() - sequential_start) * 1000
+
+    parallel_result = _run(runners)
+
+    assert parallel_result.elapsed_ms < sequential_elapsed_ms

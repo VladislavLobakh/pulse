@@ -2,17 +2,16 @@
 title: "HN collect flow (current / Implemented)"
 ---
 sequenceDiagram
-    actor User
-    participant CLI as CLI entry (main)
+    participant Par as patterns.parallel run_sources (coordinator)
+    participant Run as SourceRunner returned by hn_runner() (worker thread)
     participant HN as agents.hn (HN business logic: prompts, domain, thresholds)
     participant Graph as patterns.react StateGraph (generic engine)
     participant LLM as llm.complete_structured (OpenRouter)
     participant Col as collectors.tavily
     participant API as Tavily API
-    participant Disp as display
 
-    User->>CLI: uv run python -m pulse.main "query"
-    CLI->>HN: run_hn_react(query)
+    Par->>Run: asyncio.to_thread(runner.run, query)
+    Run->>HN: _run_for_parallel(query, max_results)
     HN->>HN: reason_llm = partial(complete_structured, models=REASON_MODELS)
     HN->>HN: observe_llm = partial(complete_structured, models=OBSERVE_MODELS)
     HN->>Graph: run_react(ReActConfig(search_fn, reason_llm, observe_llm, prompts, ...), query)
@@ -39,8 +38,8 @@ sequenceDiagram
     end
 
     Graph-->>HN: ReActResult(best_items, trace, stop_reason)
-    HN-->>CLI: ReActResult
-    CLI->>Disp: print_trace(trace) (Reason/Act/Observe lines)
-    CLI->>Disp: warn_if_below_minimum(items, min_count)
-    CLI->>Disp: print_articles(items)
-    Disp-->>User: N articles (title, url, score, summary) + stop reason
+    HN->>HN: build SourceOutput from stop_reason + min(MIN_ARTICLES, max_results)
+    HN-->>Run: SourceOutput(items, status, error)
+    Run-->>Par: SourceRunResult (adds source, elapsed_ms)
+
+    Note over HN,Graph: PULSE_VERBOSE=1 streams live Reason/Act/Observe progress to<br/>stderr from within the worker thread; PULSE_LOG_LEVEL controls debug logging.<br/>The full ReActResult.trace itself is not returned past this flow.

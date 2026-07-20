@@ -10,9 +10,9 @@ imported into the Structurizr decision log.
 
 ## Current vs target
 
-**Implemented today:** Agent Runtime with HN ReAct collection and source-neutral parallel
-runners for HN, ArXiv, YouTube and Newsletter. External integrations: Tavily, OpenRouter,
-ArXiv, YouTube and RSS newsletters.
+**Implemented today:** Agent Runtime whose CLI entry point fans out to HN ReAct collection
+and the ArXiv, YouTube and Newsletter runners concurrently via the source-neutral parallel
+coordinator. External integrations: Tavily, OpenRouter, ArXiv, YouTube and RSS newsletters.
 
 **Target (Planned):** remaining containers and flows in `Container_Target` view — see table below.
 
@@ -55,7 +55,7 @@ Tavily, OpenRouter, ArXiv, YouTube, RSS Newsletters, Twitter/X, Telegram, Linked
 
 | Container | Tech | Local / Deploy | Status |
 |---|---|---|---|
-| Agent Runtime (collectors + agents + orchestrator) | Python / LangGraph | `uv run` (CLI) | **Implemented** (HN CLI + four-source library fan-out) |
+| Agent Runtime (collectors + agents + orchestrator) | Python / LangGraph | `uv run` (CLI) | **Implemented** (four-source CLI fan-out) |
 | FastAPI Core | Modal `@asgi_app` | `https://pulse--api.modal.run` | Planned |
 | FastMCP Server | Modal `@web_endpoint` | `https://pulse--mcp.modal.run` | Planned |
 | Digest Scheduler | Modal `@cron` 08:00 | daily 08:00 UTC | Planned |
@@ -73,7 +73,9 @@ This table **must** match the containers in `workspace.dsl`.
 
 ### Implemented
 
-**HN collect** — [`architecture/flows/hn-collect.mmd`](architecture/flows/hn-collect.mmd)
+**Parallel source collect** — [`architecture/flows/parallel-collect.mmd`](architecture/flows/parallel-collect.mmd) —
+the CLI entry point; fans out to all four source runners concurrently and renders a
+per-source status/timing summary plus the combined, deduped items.
 
 ```bash
 uv run python -m pulse.main "<search query>"
@@ -82,11 +84,12 @@ uv run python -m pulse.main "<search query>"
 Preview locally:
 
 ```bash
-npx @mermaid-js/mermaid-cli -i docs/architecture/flows/hn-collect.mmd -o /tmp/hn-collect.svg
+npx @mermaid-js/mermaid-cli -i docs/architecture/flows/parallel-collect.mmd -o /tmp/parallel-collect.svg
 ```
 
-**Parallel source collect** — [`architecture/flows/parallel-collect.mmd`](architecture/flows/parallel-collect.mmd) —
-library-level multi-source fan-out; the CLI remains HN-only.
+**HN collect** — [`architecture/flows/hn-collect.mmd`](architecture/flows/hn-collect.mmd) —
+internal detail of the HN branch inside the fan-out above (reason/act/observe loop run
+in a worker thread by `hn_runner`); not a separate CLI entry point.
 
 ### Target (Planned)
 

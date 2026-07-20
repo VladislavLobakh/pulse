@@ -2,29 +2,36 @@
 
 from __future__ import annotations
 
-import sys
-
 from pulse.models import SourceItemList
-from pulse.patterns.react import TraceEvent, step_suffix
+from pulse.patterns.parallel import ParallelRunResult, SourceRunResult
 
 
-def print_trace(trace: list[TraceEvent]) -> None:
-    print("\n=== Reason / Act / Observe trace ===\n")
-    for event in trace:
-        print(f"{event.kind.capitalize()}: {event.message}{step_suffix(event)}")
-    print()
+def _format_elapsed(elapsed_ms: float) -> str:
+    return f"{elapsed_ms / 1000:.1f}s"
 
 
-def warn_if_below_minimum(items: SourceItemList, min_count: int) -> None:
-    if len(items) < min_count:
-        print(
-            f"WARNING: only {len(items)} articles returned (expected {min_count}+)",
-            file=sys.stderr,
-        )
+def _source_line(result: SourceRunResult) -> str:
+    line = (
+        f"{result.source.value:<12} {result.status.value.upper():<8}"
+        f" {len(result.items):>3} items  {_format_elapsed(result.elapsed_ms):>7}"
+    )
+    if result.error:
+        line += f"  ({result.error})"
+    return line
 
 
-def print_articles(items: SourceItemList) -> None:
-    print(f"\n=== PULSE — {len(items)} articles ===\n")
+def print_run_summary(result: ParallelRunResult) -> None:
+    print("\n=== PULSE — source summary ===\n")
+    for source_result in result.results:
+        print(_source_line(source_result))
+    print(
+        f"\nAggregate: {result.status.value.upper()} — "
+        f"{len(result.items)} unique items in {_format_elapsed(result.elapsed_ms)}"
+    )
+
+
+def print_items(items: SourceItemList) -> None:
+    print(f"\n=== PULSE — {len(items)} items ===\n")
     for i, item in enumerate(items, 1):
         print(f"{i}. {item.title}")
         print(f"   source: {item.source}")
