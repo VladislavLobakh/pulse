@@ -6,12 +6,12 @@ PULSE — personal AI intelligence & content factory: collects AI news from mult
 
 ## Current capabilities
 
-- Source runners for HN (via Tavily), ArXiv papers, YouTube transcripts, and configured
-  newsletter RSS/Atom feeds
+- Source runners for HN (via Tavily + a LangGraph ReAct reason/act/observe loop over
+  OpenRouter), ArXiv papers, YouTube transcripts, and configured newsletter RSS/Atom feeds
 - Source-neutral parallel coordinator; the CLI fans out to all four sources concurrently
   with a per-source status summary
 - CLI entry point: `uv run python -m pulse.main "<search query>"`
-- Digest, LangGraph orchestration, Qdrant — planned (see `docs/architecture.md`)
+- Digest generation, cross-source LangGraph orchestration, Qdrant — planned (see `docs/architecture.md`)
 
 ## Setup
 
@@ -72,6 +72,6 @@ pulse/
 
 ## Stack
 
-**Installed** (in `pyproject.toml`): uv · Ruff · pytest · tavily-python · httpx · feedparser · youtube-transcript-api · python-dotenv · faker
+**Installed** (in `pyproject.toml`): uv · Ruff · pytest · LangGraph · Instructor · LiteLLM · Pydantic · Tenacity · tavily-python · httpx · feedparser · youtube-transcript-api · python-dotenv · requests · faker
 
-**Planned** (see `docs/architecture.md`): LangGraph · LangChain · FastMCP · Qdrant · Mem0 · Langfuse · Modal · Inngest · LightRAG + Neo4j · PostgreSQL · Redis · Next.js dashboard
+**Planned** (see `docs/architecture.md`): LangChain · FastMCP · Qdrant · Mem0 · Langfuse · Modal · Inngest · LightRAG + Neo4j · PostgreSQL · Redis · Next.js dashboard
