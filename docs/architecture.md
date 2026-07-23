@@ -75,7 +75,7 @@ This table **must** match the containers in `workspace.dsl`.
 
 **Research workflow core** — [`architecture/flows/research-workflow.mmd`](architecture/flows/research-workflow.mmd) —
 LangGraph graph (`workflows/research.py`) that validates the query, calls the parallel coordinator
-once, and routes on aggregate status to a typed `PulseOutput`. This is the CLI's production
+once, and routes on aggregate status to a typed `PulseOutput`; this is the CLI's production
 execution path (see ADR 16).
 
 **Parallel source collect** — [`architecture/flows/parallel-collect.mmd`](architecture/flows/parallel-collect.mmd) —
