@@ -122,18 +122,19 @@ def test_main_builds_graph_from_coordinator_and_invokes_once(monkeypatch) -> Non
 
 
 def test_main_run_sources_invoked_exactly_once_through_coordinator(monkeypatch, capsys) -> None:
-    calls: list[str] = []
+    coordinator_calls: list[str] = []
     real_run_sources = main_module.run_sources
 
     async def spy(query: str, runners: list[SourceRunner]) -> ParallelRunResult:
-        calls.append(query)
+        coordinator_calls.append(query)
         return await real_run_sources(query, runners)
 
     monkeypatch.setattr(main_module, "run_sources", spy)
+    monkeypatch.setattr(main_module, "build_runners", lambda: _recording_runners([]))
 
     main_module.main(["custom query"])
 
-    assert calls == ["custom query"]
+    assert coordinator_calls == ["custom query"]
 
 
 def test_main_all_sources_succeed_shows_success_summary(monkeypatch, capsys) -> None:
