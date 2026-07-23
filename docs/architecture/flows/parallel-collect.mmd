@@ -4,7 +4,9 @@ title: "Parallel source collect flow (current / Implemented)"
 sequenceDiagram
     actor User
     participant CLI as CLI (pulse.main)
-    participant Par as patterns.parallel run_sources (coordinator)
+    participant Graph as workflows.research build_research_graph (LangGraph)
+    participant Coord as main._production_coordinator (coordinator)
+    participant Parallel as patterns.parallel run_sources (coordinator)
     participant Run as Configured source runners × N (worker threads)
     participant HN as agents.hn hn_runner
     participant React as patterns.react (ReAct engine)
@@ -22,11 +24,15 @@ sequenceDiagram
     participant Disp as display
 
     User->>CLI: uv run python -m pulse.main "query"
-    CLI->>Par: run_sources(query, build_runners())
-    Par->>Par: empty runners -> ValueError (configuration error)
+    CLI->>CLI: runners = build_runners(), coordinator = _production_coordinator(runners)
+    CLI->>Graph: build_research_graph(coordinator).ainvoke({query})
+    Graph->>Graph: initialize_state — validate query (see research-workflow.mmd)
+    Graph->>Coord: collect_sources — await coordinator(query) · once
+    Coord->>Parallel: run_sources(query, runners)
+    Parallel->>Parallel: empty runners -> ValueError (configuration error)
 
     par asyncio.gather — one asyncio.to_thread task per runner
-        Par->>Run: asyncio.to_thread(runner.run, query)
+        Parallel->>Run: asyncio.to_thread(runner.run, query)
         alt configured runner is Hacker News
             Run->>HN: _run_for_parallel(query, max_results)
             HN->>React: run_hn_react(query, max_results)
@@ -36,14 +42,14 @@ sequenceDiagram
             Run->>AX: _run_for_parallel(original_query, limits)
             AX->>AXCol: search_arxiv_papers(original_query, limits)
             AXCol->>AXCol: deterministically build fielded ArXiv query
-            AXCol->>AXCol: serialize; wait ≥3 s from previous request start
+            AXCol->>AXCol: serialize, wait ≥3 s from previous request start
             AXCol->>AXAPI: one bounded GET (30 s timeout)
             AXAPI-->>AXCol: Atom feed
-            AXCol->>AXCol: reject error feed; skip malformed papers; normalize SourceItems
+            AXCol->>AXCol: reject error feed, skip malformed papers, normalize SourceItems
             opt first 0–2 papers with PDF links
                 AXCol->>Extract: one query-focused batch (20 s timeout)
                 Extract-->>AXCol: raw_content per successful URL
-                AXCol->>AXCol: append bounded highlights; failures keep abstracts
+                AXCol->>AXCol: append bounded highlights, failures keep abstracts
             end
             AXCol-->>AX: SourceItemList
             AX-->>Run: SUCCESS or PARTIAL(no_results)
@@ -52,7 +58,7 @@ sequenceDiagram
             YT->>YTCol: search_youtube_videos(query, limits)
             YTCol->>TavS: search restricted to youtube.com
             TavS-->>YTCol: discovered video URLs
-            YTCol->>YTCol: normalize URL variants to canonical video ids; dedup
+            YTCol->>YTCol: normalize URL variants to canonical video ids, dedup
             loop first ≤ MAX_TRANSCRIPTS candidates (one shared session, finite timeout)
                 YTCol->>YTAPI: fetch transcript
                 alt captions disabled / missing / restricted
@@ -70,23 +76,26 @@ sequenceDiagram
             loop each configured feed (Latent Space, Simon Willison)
                 NLCol->>Feeds: one bounded GET (10 s timeout)
                 Feeds-->>NLCol: RSS/Atom bytes
-                NLCol->>NLCol: feed failure -> warn + continue; skip malformed entries
+                NLCol->>NLCol: feed failure -> warn + continue, skip malformed entries
             end
-            NLCol->>NLCol: deterministic keyword scoring; drop zero scores; dedup canonical URLs
+            NLCol->>NLCol: deterministic keyword scoring, drop zero scores, dedup canonical URLs
             Note over NLCol: every feed failing raises NewsletterFeedError
             NLCol-->>NL: NewsletterFetchResult(items, failed_feeds)
             NL-->>Run: SUCCESS or PARTIAL(no_results | partial_feed_failure)
         end
         alt runner raises
-            Run-->>Par: FAILED SourceRunResult (error = exception class name; safe log, no message)
+            Run-->>Parallel: FAILED SourceRunResult (error = exception class name only — no raw message)
         else runner returns SourceOutput
-            Run-->>Par: SourceRunResult keeps runner status/error, adds source + elapsed_ms
+            Run-->>Parallel: SourceRunResult keeps runner status/error, adds source + elapsed_ms
         end
     end
 
-    Par->>Par: combine non-FAILED items, dedup normalized URLs (first in runner order wins)
-    Par->>Par: aggregate status: all success / all failed / else partial
-    Par-->>CLI: ParallelRunResult(results, items, status, elapsed_ms)
+    Parallel->>Parallel: combine non-FAILED items, dedup normalized URLs (first in runner order wins)
+    Parallel->>Parallel: aggregate status: all success / all failed / else partial
+    Parallel-->>Coord: ParallelRunResult(results, items, status, elapsed_ms)
+    Coord-->>Graph: parallel_result
+    Graph->>Graph: route_by_status -> finalize_results / finalize_failure
+    Graph-->>CLI: PulseOutput(result)
     CLI->>Disp: print_run_summary(result) (per-source status/count/elapsed + aggregate line)
     alt aggregate status is FAILED
         CLI-->>User: source summary only, exit code 1, no item listing

@@ -22,6 +22,7 @@ from pulse.patterns.parallel import (
 )
 from pulse.workflows.research import (
     Coordinator,
+    InvalidQueryError,
     NodeName,
     PulseInput,
     build_research_graph,
@@ -85,7 +86,7 @@ def test_coordinator_called_exactly_once() -> None:
 def test_empty_query_raises_before_coordinator(query: str) -> None:
     coordinator = _CountingCoordinator(_success_result([]))
 
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidQueryError):
         _run(coordinator, query)
 
     assert coordinator.calls == []
