@@ -158,6 +158,49 @@ def test_status_reaches_expected_terminal_node(
     assert forbidden not in nodes
 
 
+def test_repeated_runs_are_deterministic() -> None:
+    items = [
+        _item("https://a.example/1", source=Source.HACKER_NEWS),
+        _item("https://b.example/2", source=Source.ARXIV),
+    ]
+
+    def make_result() -> ParallelRunResult:
+        # A fresh but content-equal result each call, as two independent runs
+        # of the coordinator would produce.
+        return ParallelRunResult(
+            results=[
+                SourceRunResult(
+                    source=Source.HACKER_NEWS, items=items[:1], status=RunStatus.SUCCESS
+                ),
+                SourceRunResult(
+                    source=Source.ARXIV,
+                    items=items[1:],
+                    status=RunStatus.PARTIAL,
+                    error="no_results",
+                ),
+            ],
+            items=items,
+            status=RunStatus.PARTIAL,
+        )
+
+    async def coordinator(query: str) -> ParallelRunResult:
+        return make_result()
+
+    graph = build_research_graph(coordinator)
+    first = asyncio.run(graph.ainvoke({"query": "agents"}))
+    second = asyncio.run(graph.ainvoke({"query": "agents"}))
+
+    # Same public output shape.
+    assert set(first.keys()) == set(second.keys()) == {"result"}
+    # Same order of per-source results and of combined items.
+    assert [r.source for r in first["result"].results] == [
+        r.source for r in second["result"].results
+    ]
+    assert [i.url for i in first["result"].items] == [i.url for i in second["result"].items]
+    # Same executed path, hence the same terminal branch.
+    assert _executed_nodes(coordinator) == _executed_nodes(coordinator)
+
+
 def test_public_output_exposes_only_result() -> None:
     output = _run(_CountingCoordinator(_success_result([])), "agents")
 

@@ -20,10 +20,7 @@ from typing import NotRequired, TypedDict
 
 from langgraph.graph import END, StateGraph
 
-from pulse.logging_config import get_logger
 from pulse.patterns.parallel import ParallelRunResult, RunStatus
-
-logger = get_logger(__name__)
 
 # (query) -> aggregate result. Injected so the graph never builds real sources.
 Coordinator = Callable[[str], Awaitable[ParallelRunResult]]
@@ -35,8 +32,8 @@ class PulseInput(TypedDict):
 
 class PulseState(TypedDict):
     query: str
-    parallel_result: NotRequired[ParallelRunResult]  # written by collect_sources
-    result: NotRequired[ParallelRunResult]  # written by a terminal node
+    parallel_result: NotRequired[ParallelRunResult]
+    result: NotRequired[ParallelRunResult]
 
 
 class PulseOutput(TypedDict):
