@@ -6,7 +6,7 @@ import pytest
 
 import pulse.main as main_module
 from pulse.models import Source, SourceItem
-from pulse.patterns.parallel import RunStatus, SourceOutput, SourceRunner
+from pulse.patterns.parallel import ParallelRunResult, RunStatus, SourceOutput, SourceRunner
 
 
 def _item(source: Source, url: str, title: str) -> SourceItem:
@@ -33,6 +33,17 @@ def _partial_runner(source: Source, items: list[SourceItem], error: str) -> Sour
     )
 
 
+def _recording_runners(calls: list[str]) -> list[SourceRunner]:
+    def run(query: str) -> SourceOutput:
+        calls.append(query)
+        return SourceOutput(items=[], status=RunStatus.SUCCESS)
+
+    return [
+        SourceRunner(source=source, run=run)
+        for source in (Source.HACKER_NEWS, Source.ARXIV, Source.YOUTUBE, Source.NEWSLETTER)
+    ]
+
+
 def test_build_runners_returns_all_four_sources_in_order() -> None:
     runners = main_module.build_runners()
 
@@ -44,14 +55,86 @@ def test_build_runners_returns_all_four_sources_in_order() -> None:
     ]
 
 
-def test_main_requires_a_query_argument(capsys) -> None:
+def test_main_requires_a_query_argument(monkeypatch, capsys) -> None:
     """The query always comes from the caller — there is no built-in default
     topic, so invoking the CLI without one is a usage error."""
+
+    def _fail_if_called() -> list[SourceRunner]:
+        raise AssertionError("build_runners should not be called for a missing query")
+
+    monkeypatch.setattr(main_module, "build_runners", _fail_if_called)
+
     with pytest.raises(SystemExit) as excinfo:
         main_module.main([])
 
     assert excinfo.value.code == 2
     assert "query" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("query", ["", "   "])
+def test_main_empty_or_whitespace_query_exits_2_without_traceback(
+    monkeypatch, capsys, query: str
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(main_module, "build_runners", lambda: _recording_runners(calls))
+
+    with pytest.raises(SystemExit) as excinfo:
+        main_module.main([query])
+
+    assert excinfo.value.code == 2
+    err = capsys.readouterr().err
+    assert "Traceback" not in err
+    assert calls == []
+
+
+def test_main_operational_value_error_is_not_misclassified_as_input_error(monkeypatch) -> None:
+    """An empty runner list makes `run_sources` raise a plain `ValueError` —
+    an operational/config error, not a query problem — which must propagate
+    instead of being caught as the CLI's clean input-error exit path."""
+    monkeypatch.setattr(main_module, "build_runners", lambda: [])
+
+    with pytest.raises(ValueError):
+        main_module.main(["custom query"])
+
+
+def test_main_builds_graph_from_coordinator_and_invokes_once(monkeypatch) -> None:
+    factory_calls: list[object] = []
+    invoke_calls: list[dict] = []
+
+    class _FakeGraph:
+        async def ainvoke(self, state: dict) -> dict:
+            invoke_calls.append(state)
+            return {"result": ParallelRunResult(results=[], items=[], status=RunStatus.SUCCESS)}
+
+    fake_graph = _FakeGraph()
+
+    def fake_build_research_graph(coordinator: object) -> _FakeGraph:
+        factory_calls.append(coordinator)
+        return fake_graph
+
+    monkeypatch.setattr(main_module, "build_research_graph", fake_build_research_graph)
+
+    main_module.main(["custom query"])
+
+    assert len(factory_calls) == 1
+    assert callable(factory_calls[0])
+    assert invoke_calls == [{"query": "custom query"}]
+
+
+def test_main_run_sources_invoked_exactly_once_through_coordinator(monkeypatch, capsys) -> None:
+    coordinator_calls: list[str] = []
+    real_run_sources = main_module.run_sources
+
+    async def spy(query: str, runners: list[SourceRunner]) -> ParallelRunResult:
+        coordinator_calls.append(query)
+        return await real_run_sources(query, runners)
+
+    monkeypatch.setattr(main_module, "run_sources", spy)
+    monkeypatch.setattr(main_module, "build_runners", lambda: _recording_runners([]))
+
+    main_module.main(["custom query"])
+
+    assert coordinator_calls == ["custom query"]
 
 
 def test_main_all_sources_succeed_shows_success_summary(monkeypatch, capsys) -> None:

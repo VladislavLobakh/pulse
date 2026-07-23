@@ -2,8 +2,10 @@
 title: "Research workflow core (current / Implemented)"
 ---
 flowchart TD
-    start([PulseInput · query]) --> init["initialize_state<br/>strip query"]
-    init -- "empty / whitespace" --> err(["raise ValueError<br/>(before coordinator)"])
+    cli(["pulse.main CLI"]) --> start([PulseInput · query])
+    start --> init["initialize_state<br/>strip query"]
+    init -- "empty / whitespace" --> err(["raise InvalidQueryError<br/>(before coordinator)"])
+    err --> exitInput["CLI: catch InvalidQueryError<br/>exit 2 · no traceback"]
     init -- "non-empty" --> collect["collect_sources<br/>await coordinator(query) · once"]
     collect --> coord[["patterns.parallel run_sources<br/>(gather · isolation · dedup · aggregate)"]]
     coord --> route{"route_by_status<br/>parallel_result.status"}
@@ -11,6 +13,9 @@ flowchart TD
     route -- "failed" --> failNode["finalize_failure<br/>result = parallel_result"]
     okNode --> done([PulseOutput · result])
     failNode --> done
+    done --> dispCheck{"CLI: result.status"}
+    dispCheck -- "success / partial" --> exitOk["print_run_summary + print_items<br/>exit 0"]
+    dispCheck -- "failed" --> exitFail["print_run_summary only<br/>exit 1"]
 
-    note["acyclic graph — no recursion_limit;<br/>workflow not wired to CLI yet"]
+    note["acyclic graph — no recursion_limit;<br/>this is the production CLI path (see ADR 16)"]
     collect -.-> note

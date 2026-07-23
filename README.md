@@ -50,6 +50,7 @@ pulse/
 │   ├── patterns/          # agentic pattern engines (react, …)
 │   ├── collectors/        # fetch + parse per source
 │   ├── agents/            # per-source configs (hn, …)
+│   ├── workflows/         # product workflows composing patterns (research.py)
 │   └── evals/             # live-model regression evals
 ├── tests/                 # pytest
 ├── data/                  # test fixtures + golden eval examples

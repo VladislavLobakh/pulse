@@ -73,9 +73,15 @@ This table **must** match the containers in `workspace.dsl`.
 
 ### Implemented
 
+**Research workflow core** — [`architecture/flows/research-workflow.mmd`](architecture/flows/research-workflow.mmd) —
+LangGraph graph (`workflows/research.py`) that validates the query, calls the parallel coordinator
+once, and routes on aggregate status to a typed `PulseOutput`; this is the CLI's production
+execution path (see ADR 16).
+
 **Parallel source collect** — [`architecture/flows/parallel-collect.mmd`](architecture/flows/parallel-collect.mmd) —
-the CLI entry point; fans out to all four source runners concurrently and renders a
-per-source status/timing summary plus the combined, deduped items.
+the fan-out step invoked by the research workflow graph's `collect_sources`; fans out to all
+four source runners concurrently and renders a per-source status/timing summary plus the
+combined, deduped items.
 
 ```bash
 uv run python -m pulse.main "<search query>"
@@ -90,10 +96,6 @@ npx @mermaid-js/mermaid-cli -i docs/architecture/flows/parallel-collect.mmd -o /
 **HN collect** — [`architecture/flows/hn-collect.mmd`](architecture/flows/hn-collect.mmd) —
 internal detail of the HN branch inside the fan-out above (reason/act/observe loop run
 in a worker thread by `hn_runner`); not a separate CLI entry point.
-
-**Research workflow core** — [`architecture/flows/research-workflow.mmd`](architecture/flows/research-workflow.mmd) —
-LangGraph graph (`workflows/research.py`) that validates the query, calls the parallel coordinator
-once, and routes on aggregate status to a typed `PulseOutput`. Not yet wired to the CLI (see ADR 15).
 
 ### Target (Planned)
 

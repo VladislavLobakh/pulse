@@ -26,6 +26,10 @@ from pulse.patterns.parallel import ParallelRunResult, RunStatus
 Coordinator = Callable[[str], Awaitable[ParallelRunResult]]
 
 
+class InvalidQueryError(ValueError):
+    """Empty/whitespace query — raised before the coordinator runs."""
+
+
 class PulseInput(TypedDict):
     query: str
 
@@ -52,7 +56,7 @@ def _initialize_state(state: PulseState) -> dict:
     # Reject before the coordinator runs; an empty query is a validation error,
     # not a FAILED run (which means sources actually ran and failed).
     if not query:
-        raise ValueError("empty query")
+        raise InvalidQueryError("empty query")
     return {"query": query}
 
 
