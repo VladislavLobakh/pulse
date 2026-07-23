@@ -1,0 +1,16 @@
+---
+title: "Research workflow core (current / Implemented)"
+---
+flowchart TD
+    start([PulseInput · query]) --> init["initialize_state<br/>strip query"]
+    init -- "empty / whitespace" --> err(["raise ValueError<br/>(before coordinator)"])
+    init -- "non-empty" --> collect["collect_sources<br/>await coordinator(query) · once"]
+    collect --> coord[["patterns.parallel run_sources<br/>(gather · isolation · dedup · aggregate)"]]
+    coord --> route{"route_by_status<br/>parallel_result.status"}
+    route -- "success / partial" --> okNode["finalize_results<br/>result = parallel_result"]
+    route -- "failed" --> failNode["finalize_failure<br/>result = parallel_result"]
+    okNode --> done([PulseOutput · result])
+    failNode --> done
+
+    note["acyclic graph — no recursion_limit;<br/>coordinator not wired to CLI yet"]
+    collect -.-> note
