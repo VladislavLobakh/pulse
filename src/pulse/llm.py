@@ -63,6 +63,18 @@ class ProviderBillingError(RuntimeError):
     won't fix an account issue."""
 
 
+class ProviderConfigurationError(RuntimeError):
+    """A local configuration problem (e.g. a missing API key) — not a
+    provider response at all, so retrying or falling back to another model
+    can't help."""
+
+
+class ModelsExhaustedError(RuntimeError):
+    """Every configured model failed this one request (validation or
+    completion errors on all of them) — a per-request outcome, not an
+    account-level problem, so it must not be treated as fail-fast."""
+
+
 # OpenRouter documents structured completion errors as `finish_reason: "error"`
 # with `choices[0].error = {code, message, metadata: {error_type}}`, and
 # pre-stream failures as a plain HTTP status (`error.code` per the docs, or
@@ -103,6 +115,7 @@ FAIL_FAST_ERRORS = (
     litellm.PermissionDeniedError,
     litellm.BadRequestError,
     ProviderBillingError,
+    ProviderConfigurationError,
 )
 
 
@@ -110,7 +123,7 @@ def get_api_key() -> str:
     load_dotenv()
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
-        raise RuntimeError("OPENROUTER_API_KEY not set — check .env")
+        raise ProviderConfigurationError("OPENROUTER_API_KEY not set — check .env")
     return api_key
 
 
@@ -241,6 +254,8 @@ def complete_structured[T: BaseModel](
     temperature: float,
     max_tokens: int,
 ) -> T:
+    if not models:
+        raise ProviderConfigurationError("complete_structured called with an empty model list")
     api_key = get_api_key()
     # Same cap at the litellm layer in case a call path drops the per-call
     # timeout kwarg (litellm's own default is 6000s).
@@ -274,4 +289,4 @@ def complete_structured[T: BaseModel](
             return result
 
     logger.error("All configured models exhausted: %s", models)
-    raise RuntimeError(f"All configured models exhausted: {models}") from last_error
+    raise ModelsExhaustedError(f"All configured models exhausted: {models}") from last_error
