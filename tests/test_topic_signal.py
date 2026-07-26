@@ -84,7 +84,8 @@ def test_topic_signal_rejects_out_of_range_floats(field: str, value: float) -> N
 
 
 @pytest.mark.parametrize("field", ["topic", "key_change", "evidence"])
-def test_topic_signal_rejects_empty_strings(field: str) -> None:
+@pytest.mark.parametrize("blank", ["", "   "])
+def test_topic_signal_rejects_blank_strings(field: str, blank: str) -> None:
     kwargs = dict(
         topic="t",
         event_type=EventType.OTHER,
@@ -93,7 +94,7 @@ def test_topic_signal_rejects_empty_strings(field: str) -> None:
         confidence=0.5,
         evidence="e",
     )
-    kwargs[field] = ""
+    kwargs[field] = blank
     with pytest.raises(ValidationError):
         TopicSignal(**kwargs)
 

@@ -17,7 +17,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from pulse.llm import ModelsExhaustedError
 from pulse.logging_config import get_logger
@@ -42,6 +42,10 @@ class EventType(StrEnum):
 
 
 class TopicSignal(BaseModel):
+    # min_length=1 alone accepts whitespace-only strings (" " has len 1);
+    # stripping first makes the length check mean "has real content".
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     topic: str = Field(
         min_length=1,
         description="The specific subject, technology, product, or concept this item is about.",
