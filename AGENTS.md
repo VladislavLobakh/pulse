@@ -50,6 +50,7 @@ Run everything with `uv run`; never activate the venv manually.
 - Qdrant: always `upsert`, never `delete`+`recreate`.
 - Agents never fetch directly — fetch/parse logic lives in `collectors/`.
 - **Comments:** write a comment only for a non-obvious constraint or "why" the code itself cannot express, and keep it to 1–2 lines. Never narrate what the next line does, restate names/types, describe the change just made, or duplicate what an ADR/docstring already records. Fewer comments is the default.
+- **Module docstrings:** a short summary plus the non-obvious mechanics/invariants only — size it like sibling modules (roughly 10–15 lines), not a design document. Per-decision rationale belongs as a 1–2 line comment next to the code it explains, not the header.
 
 ## Forbidden actions
 
