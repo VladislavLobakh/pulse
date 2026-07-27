@@ -368,6 +368,52 @@ def test_complete_structured_configures_json_mode_and_global_timeout(monkeypatch
     assert llm_module.litellm.request_timeout == llm_module._REQUEST_TIMEOUT_SECONDS
 
 
+def test_empty_model_list_raises_provider_configuration_error(monkeypatch) -> None:
+    """An empty models list is a caller misconfiguration (e.g. an analyzer
+    bound with no model chain), not "every model failed" — it must not be
+    misclassified as ModelsExhaustedError, which callers isolate per item
+    instead of failing the whole batch fast."""
+    called = {"n": 0}
+    monkeypatch.setattr(llm_module.instructor, "from_litellm", lambda *a, **k: called.update(n=1))
+
+    with pytest.raises(llm_module.ProviderConfigurationError):
+        llm_module.complete_structured(
+            messages=[], models=[], response_model=Dummy, temperature=0.1, max_tokens=500
+        )
+
+    assert called["n"] == 0
+
+
+def test_missing_api_key_raises_provider_configuration_error(monkeypatch) -> None:
+    """ProviderConfigurationError (a FAIL_FAST_ERRORS member) must be the
+    specific class raised, not just any RuntimeError — callers like the
+    topic_signal analyzer rely on the class identity to fail fast."""
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    with pytest.raises(llm_module.ProviderConfigurationError):
+        llm_module.complete_structured(
+            messages=[], models=MODELS, response_model=Dummy, temperature=0.1, max_tokens=500
+        )
+
+    assert llm_module.ProviderConfigurationError in llm_module.FAIL_FAST_ERRORS
+
+
+def test_fallback_chain_exhausted_raises_models_exhausted_error(monkeypatch) -> None:
+    """ModelsExhaustedError must be the specific class raised (not just any
+    RuntimeError) and must NOT be a FAIL_FAST_ERRORS member — it's the one
+    error the topic_signal analyzer isolates per-item rather than failing
+    fast on."""
+    fake = FakeClient([_error(litellm.NotFoundError), _error(litellm.NotFoundError)])
+    monkeypatch.setattr(llm_module.instructor, "from_litellm", lambda *a, **k: fake)
+
+    with pytest.raises(llm_module.ModelsExhaustedError):
+        llm_module.complete_structured(
+            messages=[], models=MODELS, response_model=Dummy, temperature=0.1, max_tokens=500
+        )
+
+    assert llm_module.ModelsExhaustedError not in llm_module.FAIL_FAST_ERRORS
+
+
 def test_call_model_logs_elapsed_time(monkeypatch, caplog) -> None:
     fake = FakeClient([Dummy(value="ok")])
     monkeypatch.setattr(llm_module.instructor, "from_litellm", lambda *a, **k: fake)

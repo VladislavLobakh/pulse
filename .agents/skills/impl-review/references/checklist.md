@@ -28,6 +28,7 @@ Verify rules in `AGENTS.md` § Core engineering rules (read the file — do not 
 - [ ] Version pins unchanged
 - [ ] LLM output → Pydantic via Instructor; LangGraph → `recursion_limit=10`
 - [ ] Qdrant: upsert only; commands use `uv run python -m …`
+- [ ] Comments 1–2 lines, non-obvious "why" only; module docstrings sized like sibling modules (~10–15 lines), not design docs — per-decision rationale sits next to the code it explains
 
 ## D. Correctness & corner cases
 
