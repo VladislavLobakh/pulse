@@ -1,5 +1,8 @@
 # PULSE — AI Intelligence & Content Factory
 
+[![CI](https://github.com/VladislavLobakh/pulse/actions/workflows/ci.yml/badge.svg)](https://github.com/VladislavLobakh/pulse/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 PULSE — personal AI intelligence & content factory: collects AI news from multiple sources, filters through a personal profile, builds a knowledge graph, and produces a digest + LinkedIn drafts.
 
 **KPI:** 1 digest instead of 3h reading · 3 LinkedIn posts/week without stress
@@ -8,12 +11,16 @@ PULSE — personal AI intelligence & content factory: collects AI news from mult
 
 - Source runners for HN (via Tavily + a LangGraph ReAct reason/act/observe loop over
   OpenRouter), ArXiv papers, YouTube transcripts, and configured newsletter RSS/Atom feeds
-- Source-neutral parallel coordinator; the CLI fans out to all four sources concurrently
-  with a per-source status summary
+- Cross-source LangGraph research workflow (`workflows/research.py`) that validates the query,
+  then fans out to all four sources concurrently via the parallel coordinator with a
+  per-source status summary
 - CLI entry point: `uv run python -m pulse.main "<search query>"`
-- Digest generation, cross-source LangGraph orchestration, Qdrant — planned (see `docs/architecture.md`)
+
+Full implemented/planned status and roadmap: [`docs/architecture.md`](docs/architecture.md).
 
 ## Setup
+
+**Prerequisites:** Python 3.13 · [uv](https://docs.astral.sh/uv/)
 
 ```bash
 # 1. Install dependencies
@@ -34,6 +41,13 @@ uv run python -m pulse.main "postgres vacuum tuning"
 uv run pytest                              # test
 uv run ruff check --fix && uv run ruff format   # lint + format
 ```
+
+## Contributing
+
+Read [`AGENTS.md`](AGENTS.md) before opening a PR — it's the canonical contract for repo
+layout, engineering rules, and forbidden actions (applies to human and AI contributors alike).
+Run the test/lint commands above before submitting; CI (`.github/workflows/ci.yml`) enforces
+the same checks on every push and PR to `main`.
 
 ## Structure
 
@@ -75,4 +89,4 @@ pulse/
 
 **Installed** (in `pyproject.toml`): uv · Ruff · pytest · LangGraph · Instructor · LiteLLM · Pydantic · Tenacity · tavily-python · httpx · feedparser · youtube-transcript-api · python-dotenv · requests · faker
 
-**Planned** (see `docs/architecture.md`): LangChain · FastMCP · Qdrant · Mem0 · Langfuse · Modal · Inngest · LightRAG + Neo4j · PostgreSQL · Redis · Next.js dashboard
+Planned additions are tracked in [`docs/architecture.md`](docs/architecture.md).
