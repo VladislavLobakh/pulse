@@ -14,6 +14,8 @@ PULSE — personal AI intelligence & content factory: collects AI news from mult
 - Cross-source LangGraph research workflow (`workflows/research.py`) that validates the query,
   then fans out to all four sources concurrently via the parallel coordinator with a
   per-source status summary
+- Per-item topic-signal extraction (`patterns/topic_signal.py`) over the collected items, shown
+  in the CLI listing with a separate analysis status
 - CLI entry point: `uv run python -m pulse.main "<search query>"`
 
 Full implemented/planned status and roadmap: [`docs/architecture.md`](docs/architecture.md).

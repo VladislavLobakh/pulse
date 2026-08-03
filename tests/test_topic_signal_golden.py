@@ -155,7 +155,7 @@ GOLDEN_CASES = [
         ),
         signal=TopicSignal(
             topic="unspecified update",
-            event_type=EventType.TUTORIAL,
+            event_type=EventType.UNKNOWN,
             key_change="Some unspecified minor fixes; no concrete detail given.",
             relevance=0.4,
             confidence=0.15,
