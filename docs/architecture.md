@@ -12,7 +12,8 @@ imported into the Structurizr decision log.
 
 **Implemented today:** Agent Runtime whose CLI entry point fans out to HN ReAct collection
 and the ArXiv, YouTube and Newsletter runners concurrently via the source-neutral parallel
-coordinator. External integrations: Tavily, OpenRouter, ArXiv, YouTube and RSS newsletters.
+coordinator, then extracts a per-item topic signal from the collected items. External
+integrations: Tavily, OpenRouter, ArXiv, YouTube and RSS newsletters.
 
 **Target (Planned):** remaining containers and flows in `Container_Target` view — see table below.
 
@@ -55,7 +56,7 @@ Tavily, OpenRouter, ArXiv, YouTube, RSS Newsletters, Twitter/X, Telegram, Linked
 
 | Container | Tech | Local / Deploy | Status |
 |---|---|---|---|
-| Agent Runtime (collectors + agents + orchestrator) | Python / LangGraph | `uv run` (CLI) | **Implemented** (four-source CLI fan-out) |
+| Agent Runtime (collectors + agents + orchestrator) | Python / LangGraph | `uv run` (CLI) | **Implemented** (four-source CLI fan-out + per-item analysis) |
 | FastAPI Core | Modal `@asgi_app` | `https://pulse--api.modal.run` | Planned |
 | FastMCP Server | Modal `@web_endpoint` | `https://pulse--mcp.modal.run` | Planned |
 | Digest Scheduler | Modal `@cron` 08:00 | daily 08:00 UTC | Planned |
@@ -75,8 +76,9 @@ This table **must** match the containers in `workspace.dsl`.
 
 **Research workflow core** — [`architecture/flows/research-workflow.mmd`](architecture/flows/research-workflow.mmd) —
 LangGraph graph (`workflows/research.py`) that validates the query, calls the parallel coordinator
-once, and routes on aggregate status to a typed `PulseOutput`; this is the CLI's production
-execution path (see ADR 16).
+once, analyzes the collected items once, and routes on aggregate status to a typed `PulseOutput`
+carrying separate collection and analysis statuses; this is the CLI's production execution path
+(see ADR 16, ADR 18).
 
 **Parallel source collect** — [`architecture/flows/parallel-collect.mmd`](architecture/flows/parallel-collect.mmd) —
 the fan-out step invoked by the research workflow graph's `collect_sources`; fans out to all

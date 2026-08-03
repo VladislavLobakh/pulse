@@ -1,23 +1,25 @@
 """Live extraction-quality eval for the topic_signal analyzer.
 
-topic_signal has no wired-in agent yet, so there is no production model list
-to regress against — this script defines its own chain and calls
-`analyze_items` directly, the same public entry point any future caller would
-use. Needs OPENROUTER_API_KEY; network use is why this is a script, not a
-pytest test.
+Sampling parameters and the default model chain are imported from the
+production composition root (`pulse.main`), so this eval cannot silently drift
+from what the app actually sends; only the chain is overridden, per model, so
+candidates can be compared. Calls `analyze_items` directly — the same public
+entry point production uses. Needs OPENROUTER_API_KEY; network use is why this
+is a script, not a pytest test.
 
-This is the first time the prompt and schema (including the `EventType` enum
-field — untested against a real Instructor/litellm JSON-mode round-trip)
-run against a real model. Prints every field for manual review: judgments
-like the RECAP/DISCUSSION boundary are exactly what a human needs to eyeball,
-not something a keyword check can grade. A few loose sanity assertions
-(relevance bounds, event_type membership) catch outright drift.
+Prints every field for manual review: judgments like the RECAP/DISCUSSION
+boundary are exactly what a human needs to eyeball, not something a keyword
+check can grade. Every case must still declare at least one machine-checkable
+expectation — `Case` refuses to be constructed otherwise, because a case with
+no expectation reports PASS unconditionally and cannot detect drift.
 
 Usage:
     uv run python -m pulse.evals.topic_signal_extraction
-        Runs every case against ANALYSIS_MODELS.
+        Runs every case against the production chain.
     uv run python -m pulse.evals.topic_signal_extraction <model-slug> [...]
-        Runs every case against the given model(s) instead.
+        Runs every case against the given candidate model(s) instead. Model
+        selection must use this form: the production chain validating itself
+        would be circular.
 """
 
 from __future__ import annotations
@@ -28,15 +30,9 @@ import sys
 from dataclasses import dataclass, field
 
 from pulse.llm import complete_structured
+from pulse.main import ANALYSIS_MODELS, LLM_MAX_TOKENS, LLM_TEMPERATURE
 from pulse.models import Source, SourceItem
 from pulse.patterns.topic_signal import EventType, TopicSignal, analyze_items
-
-ANALYSIS_MODELS = [
-    "openrouter/qwen/qwen3.5-flash-02-23",
-    "openrouter/google/gemini-2.5-flash-lite",
-]
-LLM_TEMPERATURE = 0.1
-LLM_MAX_TOKENS = 700
 
 
 @dataclass
@@ -46,7 +42,18 @@ class Case:
     item: SourceItem
     max_relevance: float | None = None  # off-topic item must score at or below
     min_relevance: float | None = None  # on-topic item must score at or above
-    expected_event_types: list[EventType] = field(default_factory=list)  # empty = no check
+    max_confidence: float | None = None  # thin-content item must score at or below
+    expected_event_types: list[EventType] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        # `is None` rather than truthiness: 0.0 is a legitimate bound.
+        if (
+            self.max_relevance is None
+            and self.min_relevance is None
+            and self.max_confidence is None
+            and not self.expected_event_types
+        ):
+            raise ValueError(f"eval case {self.name!r} declares no expectation")
 
     def run(self, model: str) -> tuple[TopicSignal | None, list[str]]:
         analyze_llm = functools.partial(
@@ -66,6 +73,10 @@ class Case:
             failures.append(f"relevance={signal.relevance:.2f} > {self.max_relevance} (off-topic)")
         if self.min_relevance is not None and signal.relevance < self.min_relevance:
             failures.append(f"relevance={signal.relevance:.2f} < {self.min_relevance} (on-topic)")
+        if self.max_confidence is not None and signal.confidence > self.max_confidence:
+            failures.append(
+                f"confidence={signal.confidence:.2f} > {self.max_confidence} (thin content)"
+            )
         if self.expected_event_types and signal.event_type not in self.expected_event_types:
             allowed = [e.value for e in self.expected_event_types]
             failures.append(f"event_type={signal.event_type.value} not in {allowed}")
@@ -118,8 +129,6 @@ CASES: list[Case] = [
         expected_event_types=[EventType.RECAP],
     ),
     Case(
-        # No assertions — this one is purely for eyeballing how the model
-        # handles a genuinely thin, near-content-free item.
         name="4 sparse item",
         query="software updates",
         item=SourceItem(
@@ -129,6 +138,9 @@ CASES: list[Case] = [
             summary="minor fixes",
             source=Source.YOUTUBE,
         ),
+        # Both validated models report 0.30 here; 0.50 leaves drift headroom.
+        max_confidence=0.50,
+        expected_event_types=[EventType.UNKNOWN],
     ),
 ]
 

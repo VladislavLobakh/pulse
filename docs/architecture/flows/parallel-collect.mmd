@@ -21,11 +21,12 @@ sequenceDiagram
     participant NL as agents.newsletter newsletter_runner
     participant NLCol as collectors.newsletter
     participant Feeds as Newsletter RSS/Atom feeds
+    participant Analyze as patterns.topic_signal analyze_items (analyzer)
     participant Disp as display
 
     User->>CLI: uv run python -m pulse.main "query"
     CLI->>CLI: runners = build_runners(), coordinator = _production_coordinator(runners)
-    CLI->>Graph: build_research_graph(coordinator).ainvoke({query})
+    CLI->>Graph: build_research_graph(coordinator, build_analyzer()).ainvoke({query})
     Graph->>Graph: initialize_state — validate query (see research-workflow.mmd)
     Graph->>Coord: collect_sources — await coordinator(query) · once
     Coord->>Parallel: run_sources(query, runners)
@@ -94,12 +95,21 @@ sequenceDiagram
     Parallel->>Parallel: aggregate status: all success / all failed / else partial
     Parallel-->>Coord: ParallelRunResult(results, items, status, elapsed_ms)
     Coord-->>Graph: parallel_result
-    Graph->>Graph: route_by_status -> finalize_results / finalize_failure
-    Graph-->>CLI: PulseOutput(result)
+    alt aggregate status is FAILED
+        Graph->>Graph: finalize_failure — AnalysisRunResult.skipped(), analyzer never called
+    else aggregate status is SUCCESS or PARTIAL
+        Graph->>Analyze: analyze_items — await analyzer(query, parallel_result.items) · once
+        Analyze-->>Graph: one TopicSignalResult per item, input order preserved
+        Graph->>Graph: AnalysisRunResult.completed(results), or .aborted(class name) on FAIL_FAST_ERRORS
+        Graph->>Graph: finalize_results — pass result + analysis through
+    end
+    Graph-->>CLI: PulseOutput(result, analysis)
     CLI->>Disp: print_run_summary(result) (per-source status/count/elapsed + aggregate line)
     alt aggregate status is FAILED
-        CLI-->>User: source summary only, exit code 1, no item listing
+        CLI-->>User: source summary only, exit code 1, no item listing, no analysis section
     else aggregate status is SUCCESS or PARTIAL
-        CLI->>Disp: print_items(result.items)
-        Disp-->>User: source summary + N combined items (title, url, score, summary)
+        CLI->>Disp: print_items(result.items, analysis.results)
+        CLI->>Disp: print_analysis_summary(analysis)
+        Disp-->>User: source summary + N items (title, url, score, summary + signal or safe error)
+        CLI-->>User: exit 0, or exit 1 when analysis status is FAILED
     end

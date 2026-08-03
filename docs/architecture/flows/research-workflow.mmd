@@ -9,13 +9,14 @@ flowchart TD
     init -- "non-empty" --> collect["collect_sources<br/>await coordinator(query) · once"]
     collect --> coord[["patterns.parallel run_sources<br/>(gather · isolation · dedup · aggregate)"]]
     coord --> route{"route_by_status<br/>parallel_result.status"}
-    route -- "success / partial" --> okNode["finalize_results<br/>result = parallel_result"]
-    route -- "failed" --> failNode["finalize_failure<br/>result = parallel_result"]
-    okNode --> done([PulseOutput · result])
+    route -- "success / partial" --> analyze["analyze_items<br/>await analyzer(query, items) · once<br/>AnalysisRunResult.completed / .aborted"]
+    route -- "failed" --> failNode["finalize_failure<br/>AnalysisRunResult.skipped() · analyzer never called"]
+    analyze --> okNode["finalize_results<br/>pass result + analysis through"]
+    okNode --> done([PulseOutput · result + analysis])
     failNode --> done
     done --> dispCheck{"CLI: result.status"}
-    dispCheck -- "success / partial" --> exitOk["print_run_summary + print_items<br/>exit 0"]
+    dispCheck -- "success / partial" --> exitOk["print_run_summary + print_items + print_analysis_summary<br/>exit 0, or exit 1 if analysis FAILED"]
     dispCheck -- "failed" --> exitFail["print_run_summary only<br/>exit 1"]
 
-    note["acyclic graph — no recursion_limit;<br/>this is the production CLI path (see ADR 16)"]
+    note["acyclic graph — no recursion_limit;<br/>this is the production CLI path (see ADR 16, ADR 18)"]
     collect -.-> note

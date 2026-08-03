@@ -18,9 +18,12 @@ from pydantic import ValidationError
 from pulse import llm as llm_module
 from pulse.models import Source, SourceItem
 from pulse.patterns.topic_signal import (
+    AnalysisRunResult,
+    AnalysisRunStatus,
     AnalysisStatus,
     EventType,
     TopicSignal,
+    TopicSignalResult,
     analyze_items,
 )
 
@@ -309,3 +312,57 @@ def test_cancellation_propagates_and_is_not_swallowed() -> None:
     finally:
         # The worker thread cannot be interrupted; unblock it so pytest exits.
         release.set()
+
+
+# --- Run-status aggregation ---
+
+
+def _result(status: AnalysisStatus) -> TopicSignalResult:
+    return TopicSignalResult(item=_item("https://a.example/1"), status=status)
+
+
+@pytest.mark.parametrize(
+    ("statuses", "expected"),
+    [
+        ([], AnalysisRunStatus.SUCCESS),
+        ([AnalysisStatus.SUCCESS], AnalysisRunStatus.SUCCESS),
+        ([AnalysisStatus.SUCCESS, AnalysisStatus.SUCCESS], AnalysisRunStatus.SUCCESS),
+        ([AnalysisStatus.FAILED], AnalysisRunStatus.FAILED),
+        ([AnalysisStatus.FAILED, AnalysisStatus.FAILED], AnalysisRunStatus.FAILED),
+        ([AnalysisStatus.SUCCESS, AnalysisStatus.FAILED], AnalysisRunStatus.PARTIAL),
+    ],
+)
+def test_completed_run_aggregates_item_statuses(
+    statuses: list[AnalysisStatus], expected: AnalysisRunStatus
+) -> None:
+    run = AnalysisRunResult.completed([_result(s) for s in statuses])
+
+    assert run.status is expected
+    assert run.analyzed_count == statuses.count(AnalysisStatus.SUCCESS)
+    assert run.failed_count == statuses.count(AnalysisStatus.FAILED)
+    assert run.error is None
+
+
+def test_completed_run_never_reports_skipped() -> None:
+    """SKIPPED means the analyzer was never called, so no result set can imply it."""
+    for statuses in ([], [AnalysisStatus.SUCCESS], [AnalysisStatus.FAILED]):
+        run = AnalysisRunResult.completed([_result(s) for s in statuses])
+        assert run.status is not AnalysisRunStatus.SKIPPED
+
+
+def test_aborted_run_exposes_the_error_and_no_per_item_results() -> None:
+    run = AnalysisRunResult.aborted("ProviderConfigurationError")
+
+    assert run.results is None
+    assert run.status is AnalysisRunStatus.FAILED
+    assert run.error == "ProviderConfigurationError"
+    assert run.analyzed_count == 0
+    assert run.failed_count == 0
+
+
+def test_skipped_run_is_not_a_failed_run() -> None:
+    run = AnalysisRunResult.skipped()
+
+    assert run.results is None
+    assert run.status is AnalysisRunStatus.SKIPPED
+    assert run.error is None

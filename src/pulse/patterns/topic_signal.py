@@ -56,7 +56,12 @@ class TopicSignal(BaseModel):
         "reads as a rehash of something already announced (e.g. 'as "
         "previously announced...') — never infer repetition by comparing "
         "against other items, since none are available. Use UNKNOWN when the "
-        "item's content does not give enough evidence to categorize it."
+        "item's content does not give enough evidence to categorize it: if "
+        "the title and summary are generic boilerplate such as 'update', "
+        "'minor fixes', 'news', or 'thoughts?', with no named subject and no "
+        "stated change, the correct answer is UNKNOWN. Picking a specific "
+        "category from a generic word is a guess, not a judgment — never "
+        "assume RELEASE just because the item mentions an update or a fix."
     )
     key_change: str = Field(
         min_length=1,
@@ -76,7 +81,11 @@ class TopicSignal(BaseModel):
         le=1,
         description="Confidence in the accuracy of this extraction given the "
         "item's content (0 = mostly guessing due to sparse or ambiguous "
-        "content, 1 = clearly supported).",
+        "content, 1 = clearly supported). Score by how much the item actually "
+        "says, not by how fluent your own answer reads: when the content is "
+        "generic boilerplate with no named subject and no stated change, stay "
+        "below 0.5, and reserve scores above 0.8 for items whose own text "
+        "states the subject and the change outright.",
     )
     evidence: str = Field(
         min_length=1,
@@ -93,12 +102,68 @@ class AnalysisStatus(StrEnum):
     FAILED = "failed"
 
 
+class AnalysisRunStatus(StrEnum):
+    """Whole-run outcome. SKIPPED means the stage never ran at all, which is
+    not the same as having run and failed."""
+
+    SUCCESS = "success"
+    PARTIAL = "partial"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
 @dataclass
 class TopicSignalResult:
     item: SourceItem
     status: AnalysisStatus
     signal: TopicSignal | None = None
     error: str | None = None
+
+
+def _aggregate_status(results: list[TopicSignalResult]) -> AnalysisRunStatus:
+    statuses = {result.status for result in results}
+    # Empty means the analyzer ran over an empty item list, which succeeded
+    # trivially; the set-based checks below would call it PARTIAL.
+    if not statuses or statuses == {AnalysisStatus.SUCCESS}:
+        return AnalysisRunStatus.SUCCESS
+    if statuses == {AnalysisStatus.FAILED}:
+        return AnalysisRunStatus.FAILED
+    return AnalysisRunStatus.PARTIAL
+
+
+@dataclass
+class AnalysisRunResult:
+    """Whole-run analysis outcome, the analyzer's counterpart to
+    `ParallelRunResult`. Build it through the three constructors below rather
+    than directly: they are the only shapes a run can end in, and they keep
+    `status` from disagreeing with `results`.
+    """
+
+    results: list[TopicSignalResult] | None  # None when no complete set was returned
+    status: AnalysisRunStatus
+    error: str | None = None
+
+    @property
+    def analyzed_count(self) -> int:
+        return sum(1 for r in self.results or () if r.status is AnalysisStatus.SUCCESS)
+
+    @property
+    def failed_count(self) -> int:
+        return sum(1 for r in self.results or () if r.status is AnalysisStatus.FAILED)
+
+    @classmethod
+    def completed(cls, results: list[TopicSignalResult]) -> AnalysisRunResult:
+        return cls(results=results, status=_aggregate_status(results))
+
+    @classmethod
+    def aborted(cls, error: str) -> AnalysisRunResult:
+        """A shared failure stopped the batch, so no per-item outcome is
+        trustworthy — not even for items whose calls had already returned."""
+        return cls(results=None, status=AnalysisRunStatus.FAILED, error=error)
+
+    @classmethod
+    def skipped(cls) -> AnalysisRunResult:
+        return cls(results=None, status=AnalysisRunStatus.SKIPPED)
 
 
 @dataclass
@@ -121,7 +186,10 @@ def _build_messages(query: str, item: SourceItem) -> list[dict]:
         "you have no access to other items or prior history, so never infer "
         "repetition or trends by comparison; use the RECAP and UNKNOWN "
         "event_type values as described for what this one item's own wording "
-        "supports."
+        "supports. A thin item is a valid outcome, not a problem to solve: "
+        "when the content barely says anything, report that honestly through "
+        "UNKNOWN and a low confidence rather than inventing a specific "
+        "category the text does not support."
     )
     user = (
         f"Original query: {query!r}\n\n"
