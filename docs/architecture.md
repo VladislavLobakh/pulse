@@ -32,8 +32,8 @@ both as the same fact, so they cannot drift apart. ADRs answer *"why was this ch
 ## Depth policy
 
 - **L1 Context** and **L2 Container** — always, in Structurizr.
-- **L3 Component / L4 Code — not used yet.** The five source agents
-  (HN / ArXiv / YouTube / Newsletter / Twitter) run **in-process** inside the *Agent Runtime*
+- **L3 Component / L4 Code — not used yet.** The four source agents
+  (HN / ArXiv / YouTube / Newsletter) run **in-process** inside the *Agent Runtime*
   container, so they are *components*, not containers — they appear only in Mermaid flows.
 - **Trigger to introduce L3 later:** when a single container's behavioral flow exceeds
   ~20 nodes, or that container gains independently meaningful sub-modules worth their own
@@ -44,7 +44,7 @@ both as the same fact, so they cannot drift apart. ADRs answer *"why was this ch
 **Person** — a human actor (`User`).
 
 **Software System (external)** — something PULSE talks to but does not own:
-Tavily, OpenRouter, ArXiv, YouTube, RSS Newsletters, Twitter/X, Telegram, LinkedIn, Inngest, Mem0 Cloud.
+Tavily, OpenRouter, ArXiv, YouTube, RSS Newsletters, Telegram, LinkedIn, Inngest, Mem0 Cloud.
 
 **Container** — a **separately runnable / deployable process or data store** that PULSE owns.
 

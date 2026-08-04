@@ -16,6 +16,8 @@ PULSE — personal AI intelligence & content factory: collects AI news from mult
   per-source status summary
 - Per-item topic-signal extraction (`patterns/topic_signal.py`) over the collected items, shown
   in the CLI listing with a separate analysis status
+- Source-neutral research planner (`patterns/planner.py`) that turns a query and the available
+  sources into a validated, bounded `ExecutionPlan` — not yet wired into a workflow
 - CLI entry point: `uv run python -m pulse.main "<search query>"`
 
 Full implemented/planned status and roadmap: [`docs/architecture.md`](docs/architecture.md).

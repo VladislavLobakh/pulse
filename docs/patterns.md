@@ -6,7 +6,7 @@ Behavioral detail lives in [`docs/architecture/flows/*.mmd`](architecture/flows/
 |---|---|---|---|
 | Tool use | Source agents call collectors / MCP tools | `ToolCall` | [`hn-collect.mmd`](architecture/flows/hn-collect.mmd) |
 | ReAct loop | Generic engine (`patterns/react.py`): reason → act → observe → decide, driven per-source by a `ReActConfig` (**Implemented**, HN is the first source wired in via `agents/hn.py`) | `ReasonDecision`, `SourceBatchScore` | [`hn-collect.mmd`](architecture/flows/hn-collect.mmd) |
-| Plan-and-Execute | Planning agent before scheduled digest runs | `ExecutionPlan` | [`daily-digest.mmd`](architecture/flows/daily-digest.mmd) |
+| Plan-and-Execute | Source-neutral planner (`patterns/planner.py`) turning a query and available sources into a bounded task list (**Implemented**, planning half only — not yet wired into a workflow) | `ExecutionPlan` | [`daily-digest.mmd`](architecture/flows/daily-digest.mmd) |
 | Routing | RAG router: live / archive / graph / research modes | `RouteDecision` | [`langgraph-orchestrator.mmd`](architecture/flows/langgraph-orchestrator.mmd) |
 | Self-correction | Critique loop on digest and LinkedIn drafts (max 3) | `CritiqueResult` | [`content-pipeline.mmd`](architecture/flows/content-pipeline.mmd) |
 | Parallel research | Concurrent source runners with failure isolation and normalized-URL dedup (**Implemented** in `patterns/parallel.py`) | `SourceOutput`, `SourceRunResult`, `ParallelRunResult` | [`parallel-collect.mmd`](architecture/flows/parallel-collect.mmd) |
