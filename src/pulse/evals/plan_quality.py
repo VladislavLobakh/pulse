@@ -129,10 +129,8 @@ CASES: list[Case] = [
     ),
 ]
 
-# Unavailable-source rejection and duplicate-task rejection are contract
-# guarantees, not model-quality signals: `plan_research` cannot return a plan
-# violating either, for any model. Those cases live in
-# `tests/test_planner_golden.py`, which proves the contract offline instead.
+# Unavailable-source and duplicate-task rejection are contract guarantees, not model signals;
+# `tests/test_planner_golden.py` verifies them offline.
 
 
 def main(argv: list[str] | None = None) -> int:
