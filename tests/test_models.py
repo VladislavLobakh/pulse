@@ -41,11 +41,10 @@ def test_source_enum_serializes_as_plain_string() -> None:
 
 
 def test_source_enum_lists_all_sources() -> None:
-    assert len(Source) == 5
+    assert len(Source) == 4
     assert {s.value for s in Source} == {
         "hacker_news",
         "arxiv",
         "youtube",
         "newsletter",
-        "twitter",
     }

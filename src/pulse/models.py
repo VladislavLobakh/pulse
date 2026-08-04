@@ -15,7 +15,6 @@ class Source(StrEnum):
     ARXIV = "arxiv"
     YOUTUBE = "youtube"
     NEWSLETTER = "newsletter"
-    TWITTER = "twitter"
 
 
 @dataclass

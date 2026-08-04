@@ -108,7 +108,7 @@ GOLDEN_CASES = [
             url="https://a.example/vague-post",
             score=0.2,
             summary="just something I've been thinking about lately, curious what others think",
-            source=Source.TWITTER,
+            source=Source.HACKER_NEWS,
         ),
         signal=TopicSignal(
             topic="unspecified",

@@ -22,14 +22,13 @@ workspace "PULSE" "AI Intelligence & Content Factory — C4 structural model (L1
         linkedin     = softwareSystem "LinkedIn"          "Publish target for generated posts."             "External,Planned"
         inngest      = softwareSystem "Inngest"           "Durable async + human-in-the-loop pauses."       "External,Planned"
         mem0cloud    = softwareSystem "Mem0 Cloud"        "Optional hosted profile-memory tier."            "External,Planned"
-        twitter      = softwareSystem "Twitter/X"         "AI community discussions and announcements."     "External,Planned"
 
         # --- The system (L2 Container) ---
         pulse = softwareSystem "PULSE" "Personal AI intelligence & content factory." {
 
             !adrs decisions adrtools
 
-            agentRuntime = container "Agent Runtime" "Collectors, source agents and the LangGraph orchestrator. Source agents (HN/ArXiv/YouTube/Newsletter/Twitter) are in-process components here — not separate containers." "Python / LangGraph" "Implemented"
+            agentRuntime = container "Agent Runtime" "Collectors, source agents and the LangGraph orchestrator. Source agents (HN/ArXiv/YouTube/Newsletter) are in-process components here — not separate containers." "Python / LangGraph" "Implemented"
 
             fastapiCore  = container "FastAPI Core"        "REST entrypoint that invokes agent pipelines on demand." "Modal @asgi_app"       "Planned"
             fastmcpSrv   = container "FastMCP Server"       "Exposes PULSE collectors as standardized MCP tools."    "Modal @web_endpoint"   "Planned"
@@ -55,7 +54,6 @@ workspace "PULSE" "AI Intelligence & Content Factory — C4 structural model (L1
         pulse.agentRuntime -> newsletters  "Fetches feeds from"               "RSS"             "Implemented"
         pulse.agentRuntime -> linkedin     "Publishes posts to (stub)"        "HTTPS"           "Planned"
         pulse.agentRuntime -> mem0cloud    "Reads/writes profile (optional)"  "HTTPS"           "Planned"
-        pulse.agentRuntime -> twitter      "Fetches AI discussions from"      "HTTPS"           "Planned"
 
         pulse.agentRuntime -> pulse.qdrant    "Upserts embeddings"            "gRPC"            "Planned"
         pulse.agentRuntime -> pulse.neo4j     "Indexes knowledge graph"       "Bolt"            "Planned"
